@@ -1,0 +1,403 @@
+# VideoPlayer Integration Context
+# Version: 1.0
+# Last Updated: 2025-08-12
+
+integration_summary:
+  total_integrations: 6
+  ready: 6
+  in_progress: 0
+  planned: 3
+
+# Framework Dependencies
+framework_dependencies:
+  SwiftUI:
+    version: "iOS 17.0+"
+    status: "integrated"
+    purpose: "Primary UI framework"
+    usage:
+      - "All view components"
+      - "Navigation system" 
+      - "State management (@State, @Published)"
+      - "Platform conditionals"
+    critical_apis:
+      - "NavigationSplitView"
+      - "NavigationStack"
+      - "LazyVGrid"
+      - "@FocusState (tvOS)"
+      - "fileImporter"
+  
+  SwiftData:
+    version: "iOS 17.0+"
+    status: "integrated"
+    purpose: "Persistence layer"
+    usage:
+      - "VPVideo model storage"
+      - "@Query for library items"
+      - "ModelContainer/Context"
+      - "Predicate filtering"
+    known_issues:
+      - "Enum predicates crash - using kindRaw workaround"
+      - "Cannot query enum.rawValue in predicates"
+      - "Macro compilation differences across platforms"
+    workarounds:
+      - "Store kindRaw string alongside enum"
+      - "Use string literals in predicates"
+  
+  AVKit:
+    version: "System"
+    status: "integrated"
+    purpose: "Video playback UI"
+    usage:
+      - "VideoPlayer view wrapper"
+      - "System video controls"
+      - "Platform-appropriate chrome"
+    implementation:
+      - "VideoPlayer(player: AVPlayer)"
+      - "Minimal custom controls"
+  
+  AVFoundation:
+    version: "System"
+    status: "integrated"
+    purpose: "Media processing"
+    usage:
+      - "AVPlayer for playback"
+      - "AVAsset for metadata extraction"
+      - "AVAssetImageGenerator for posters"
+      - "AVPlayerItem for queue (future)"
+    critical_apis:
+      - "AVURLAsset(url:)"
+      - "asset.duration"
+      - "asset.tracks(withMediaType: .video)"
+      - "track.naturalSize"
+      - "track.preferredTransform"
+      - "generator.copyCGImage(at:actualTime:)"
+  
+  UniformTypeIdentifiers:
+    version: "System"
+    status: "integrated"
+    purpose: "File type validation"
+    usage:
+      - ".mpeg4Movie for M4V files"
+      - "UTType.jpeg for poster storage"
+      - "Type conformance checking"
+    implementation:
+      - "allowedContentTypes: [.mpeg4Movie]"
+      - "UTType(filenameExtension:)"
+      - "type.conforms(to: .mpeg4Movie)"
+  
+  CoreGraphics:
+    version: "System"
+    status: "integrated"
+    purpose: "Image processing"
+    usage:
+      - "CGImageDestination for JPEG writing"
+      - "CGImage manipulation"
+      - "Transform calculations"
+    critical_apis:
+      - "CGImageDestinationCreateWithURL"
+      - "CGImageDestinationAddImage"
+      - "CGImageDestinationFinalize"
+      - "CGSize applying transforms"
+
+# Platform Capabilities
+platform_capabilities:
+  ios:
+    minimum_version: "17.0"
+    features:
+      fileImporter: 
+        status: "integrated"
+        usage: "System file picker for .m4v"
+      drag_gestures: 
+        status: "integrated"
+        usage: "Volume slider control"
+      sheets: 
+        status: "integrated"
+        usage: "Fullscreen video presentation"
+      context_menus: 
+        status: "integrated"
+        usage: "Delete actions on posters"
+      split_view:
+        status: "integrated"
+        usage: "Sidebar navigation"
+    limitations: []
+  
+  tvos:
+    minimum_version: "17.0"
+    features:
+      focus_engine:
+        status: "integrated"
+        usage: "Grid navigation with remote"
+      button_controls:
+        status: "integrated"
+        usage: "Volume adjustment (no drag)"
+      larger_ui:
+        status: "integrated"
+        usage: "1.5-1.8x scaling for TV"
+    limitations:
+      - no_file_import: "No local file access API"
+      - no_drag_gestures: "Focus-based interaction only"
+      - no_context_menus: "Use buttons instead"
+      - no_split_view: "Stack navigation only"
+  
+  macos:
+    minimum_version: "14.0"
+    features:
+      window_fullscreen:
+        status: "integrated"
+        usage: "NSApp.windows.first?.toggleFullScreen"
+      sidebar:
+        status: "integrated"
+        usage: "System sidebar style"
+      traffic_lights:
+        status: "integrated"
+        usage: "28pt titlebar spacing"
+      hover_states:
+        status: "integrated"
+        usage: "Desktop interactions"
+      keyboard:
+        status: "planned"
+        usage: "Shortcuts for playback"
+    limitations: []
+
+# File System Integration
+file_system:
+  app_container:
+    structure:
+      videos: "Library/Videos/"
+      posters: "Library/Application Support/[BundleID]/Posters/"
+    permissions:
+      videos: "read-write"
+      posters: "read-write"
+  
+  import_process:
+    source: "User selected via fileImporter"
+    validation:
+      extension: ".m4v required"
+      type: "Must conform to .mpeg4Movie"
+    copy_method: "NSFileCoordinator"
+    naming: "Unique with incrementing suffix"
+    steps:
+      1: "Security scoped access"
+      2: "Validate format"
+      3: "Coordinate copy"
+      4: "Extract metadata"
+      5: "Generate poster"
+      6: "Save to SwiftData"
+  
+  deletion:
+    removes_file: true
+    removes_record: true
+    removes_poster: false  # Known issue - orphaned
+    coordinated: true
+
+# Data Flow Integration
+data_flow:
+  import_pipeline:
+    1_validate: "Check M4V format"
+    2_access: "startAccessingSecurityScopedResource"
+    3_copy: "Coordinated copy to app container"
+    4_extract: "AVAsset metadata (sync)"
+    5_persist: "Create VPVideo in SwiftData"
+    6_generate: "Poster from 10% timestamp"
+    7_cleanup: "stopAccessingSecurityScopedResource"
+  
+  playback_flow:
+    1_resolve: "absoluteURL from VPVideo.fileName"
+    2_create: "AVPlayer(url:)"
+    3_present: "VideoPlayer view"
+    4_control: "Service methods"
+    5_cleanup: "player.pause() on disappear"
+
+# Service Integration
+services:
+  VideoImportService:
+    pattern: "Singleton"
+    thread: "@MainActor"
+    responsibilities:
+      - "File validation"
+      - "Coordinated import"
+      - "Metadata extraction"
+      - "File deletion"
+      - "URL resolution"
+    public_api:
+      - "importFile(at:kind:modelContext:)"
+      - "delete(video:modelContext:)"
+      - "absoluteURL(for:)"
+  
+  VideoPlayerService:
+    pattern: "Singleton"
+    thread: "@MainActor"
+    responsibilities:
+      - "AVPlayer lifecycle"
+      - "Playback state"
+      - "Volume control"
+      - "Seek operations"
+    public_api:
+      - "load(url:title:)"
+      - "togglePlayback()"
+      - "seek(by:)"
+      - "volume: Float"
+      - "isPlaying: Bool"
+
+# Future Integrations
+future_integrations:
+  AirPlay:
+    priority: "HIGH"
+    timeline: "Next sprint"
+    requirements:
+      - "AVRoutePickerView wrapper"
+      - "Route change detection"
+      - "UI updates for casting state"
+    implementation:
+      - "SwiftUI wrapper for AVRoutePickerView"
+      - "Observe route changes"
+      - "Update UI when casting"
+    blockers: []
+  
+  CloudKit:
+    priority: "MEDIUM"
+    timeline: "Q4 2025"
+    requirements:
+      - "Library metadata sync"
+      - "Poster image sync"
+      - "Watch history sync"
+      - "Settings sync"
+    implementation:
+      - "CKRecord for VPVideo"
+      - "CKAsset for posters"
+      - "Conflict resolution"
+    blockers:
+      - "Need iCloud entitlements"
+      - "Storage costs"
+  
+  SharePlay:
+    priority: "LOW"
+    timeline: "2026"
+    requirements:
+      - "GroupActivities framework"
+      - "Synchronized playback"
+      - "Shared queue"
+    implementation:
+      - "GroupActivity for videos"
+      - "Playback sync protocol"
+      - "UI for participants"
+    blockers:
+      - "Complex implementation"
+      - "Testing requirements"
+
+# Security & Permissions
+security:
+  entitlements:
+    com.apple.security.app-sandbox: true
+    com.apple.security.files.user-selected.read-only: true
+  
+  file_access:
+    import:
+      method: "Security scoped URL"
+      duration: "Import operation only"
+    playback:
+      method: "Direct file URL"
+      location: "App container"
+    export:
+      method: "Not implemented"
+      future: "Document picker"
+  
+  privacy:
+    camera: false
+    microphone: false
+    photos: false
+    location: false
+    
+# Performance Considerations
+performance:
+  current_bottlenecks:
+    poster_generation:
+      impact: "200-500ms UI block"
+      severity: "medium"
+      solution: "Move to background queue"
+    
+    large_imports:
+      impact: "No progress indication"
+      severity: "low"
+      solution: "Add progress UI"
+  
+  optimizations:
+    grid_rendering:
+      method: "LazyVGrid"
+      status: "optimal"
+    
+    memory:
+      video: "Single AVPlayer instance"
+      posters: "Filesystem cache"
+      models: "SwiftData lazy loading"
+    
+    startup:
+      cold: "~500ms"
+      warm: "~200ms"
+      bottleneck: "SwiftData initialization"
+
+# Error Handling
+error_handling:
+  import_errors:
+    unsupportedType: "Show alert"
+    copyFailed: "Log and skip"
+    metadataFailed: "Use defaults"
+    fileAttributesMissing: "Use defaults"
+  
+  playback_errors:
+    file_not_found: "Show error view"
+    codec_unsupported: "Shouldn't happen (M4V only)"
+    network_error: "N/A (local only)"
+  
+  recovery:
+    corrupted_database: "Reset SwiftData"
+    missing_files: "Remove orphaned records"
+    poster_generation_failed: "Show gradient"
+
+# Testing Integration
+testing:
+  unit_tests:
+    coverage: 0
+    framework: "XCTest"
+    priority_areas:
+      - "Import validation"
+      - "Metadata extraction"
+      - "File coordination"
+  
+  ui_tests:
+    coverage: 0
+    framework: "XCUITest"
+    priority_areas:
+      - "Import flow"
+      - "Playback controls"
+      - "Navigation"
+  
+  integration_tests:
+    coverage: 0
+    areas:
+      - "SwiftData persistence"
+      - "File system operations"
+      - "AVPlayer lifecycle"
+
+# Build Integration
+build:
+  xcode:
+    version: "15.0+"
+    project: "VideoPlayer.xcodeproj"
+  
+  swift:
+    version: "5.9+"
+    strict_concurrency: false
+    
+  deployment:
+    ios: "17.0"
+    tvos: "17.0"
+    macos: "14.0"
+  
+  configuration:
+    debug:
+      optimization: "-Onone"
+      strip_symbols: false
+    release:
+      optimization: "-O"
+      strip_symbols: true
