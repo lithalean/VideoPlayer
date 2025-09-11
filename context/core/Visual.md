@@ -1,379 +1,511 @@
 # VideoPlayer Visual Design Context
 
-**Purpose**: Complete visual design system for QuickTime-style video player  
-**Version**: 1.0  
-**Design Language**: Apple HIG + DVD Library Aesthetic  
-**Last Updated**: August 12, 2025
+**Purpose**: Visual design system for filesystem-based video player with glass UI  
+**Version**: 2.0  
+**Design Language**: Apple HIG + Glass Design + DVD Library Aesthetic  
+**Last Updated**: September 2025
 
-## Visual Hierarchy
+## Visual Architecture
+
+### Design System Hierarchy
 ```
-Z-LAYERS (back→front):
-├─[0] Background (black/gradient)
-├─[1] Content (grids/posters)
-├─[2] Controls (buttons/overlays)
-└─[3] Overlays (sheets/fullscreen)
+┌─────────────────────────────────────┐
+│      Glass Design System (2025)     │
+│  ┌────────────────────────────────┐ │
+│  │    Inspector Panel (Glass)     │ │
+│  │  ┌──────────────────────────┐  │ │
+│  │  │   FileBrowser (Lists)    │  │ │
+│  │  └──────────────────────────┘  │ │
+│  └────────────────────────────────┘ │
+│  ┌────────────────────────────────┐ │
+│  │    Content Grids (2:3)         │ │
+│  │  ┌────┐ ┌────┐ ┌────┐         │ │
+│  │  │    │ │    │ │    │         │ │
+│  │  └────┘ └────┘ └────┘         │ │
+│  └────────────────────────────────┘ │
+└─────────────────────────────────────┘
 ```
 
-## Quick Reference Tables
+## Core Visual Components
 
-### Color Palette
-| Element | Light Mode | Dark Mode | Usage |
-|---------|------------|-----------|-------|
-| **Background** | .systemBackground | .black | Base layer |
-| **Poster Gradient Start** | .accentColor(0.55) | Same | Fallback poster top |
-| **Poster Gradient Mid** | .accentColor(0.25) | Same | Fallback poster middle |
-| **Poster Gradient End** | .black(0.25) | Same | Fallback poster bottom |
-| **Bottom Fade** | .black(0.28) | Same | Poster overlay gradient |
-| **Glass Material** | .regularMaterial | .ultraThinMaterial | Controls/bars |
-| **Shadow iOS** | .black(0.12) | .black(0.12) | Poster depth |
-| **Shadow tvOS** | .black(0.30) | .black(0.30) | Enhanced depth |
-| **Duration Pill** | .black(0.55) | Same | Time overlay background |
-| **Backdrop** | .accentColor(0.45→0.18) | Same | MovieView gradient |
+### Inspector Panel (Glass Design)
 
-### Spacing System
-| Token | iOS/macOS | tvOS | Usage |
-|-------|-----------|------|-------|
-| **xs** | 2pt | 4pt | Micro adjustments |
-| **small** | 8pt | 12pt | Internal padding |
-| **medium** | 16pt | 24pt | Component spacing |
-| **large** | 20pt | 32pt | Section gaps |
-| **grid** | 16pt | 24pt | Poster grid spacing |
-| **sidebar** | 12pt | 16pt | Sidebar padding |
-
-### Typography Scale
-| Style | iOS/macOS | tvOS | Weight | Usage |
-|-------|-----------|------|--------|-------|
-| **Overlay Title** | .title | .largeTitle | Bold | Movie title on playback |
-| **Grid Title** | .subheadline | .headline | Semibold | Poster card labels |
-| **Duration** | .caption2 | .caption2 | Regular | Duration pills |
-| **Badge** | .caption2 | .caption2 | Regular | Sidebar counts |
-| **Button** | .headline | .title3 | Medium | Play button |
-| **Volume** | .caption | .caption | Regular | Volume percentage |
-
-### Corner Radius
-| Component | iOS/macOS | tvOS | Style |
-|-----------|-----------|------|-------|
-| **Poster** | 12pt | 18pt | continuous |
-| **Glass Bar** | 28pt | 28pt | continuous |
-| **Buttons** | 10pt | 12pt | continuous |
-| **Pills** | full | full | capsule |
-
-## Component Specifications
-
-### MoviePoster (2:3 DVD Aspect)
 ```yaml
-aspect_ratio: 2/3  # DVD/Blu-ray standard
-corner_radius:
-  ios: 12pt
-  tvos: 18pt
-  style: continuous
-shadow:
-  ios: 
-    color: black(0.12)
-    radius: 8pt
-    x: 0
-    y: 4pt
-  tvos:
-    color: black(0.30)
-    radius: 18pt
-    x: 0
-    y: 8pt
-bottom_fade:
-  gradient_stops:
-    - { color: clear, location: 0.60 }
-    - { color: black(0.17), location: 0.82 }
-    - { color: black(0.28), location: 1.00 }
-  direction: top_to_bottom
-fallback:
-  gradient:
-    colors: [accentColor(0.55), accentColor(0.25), black(0.25)]
-    direction: topLeading_to_bottomTrailing
-  icon:
-    symbol: "film"
-    size: { ios: 42pt, tvos: 60pt }
-    weight: light
-    opacity: 0.9
-```
+dimensions:
+  width: 
+    macOS: 320pt
+    iOS: 280pt
+    tvOS: 360pt (standalone)
+  split: 
+    outliner: 75%
+    import: 25%
 
-### Movies Grid Layout
-```yaml
-type: LazyVGrid
-columns:
-  ios: 
-    adaptive: { min: 140pt, max: 220pt }
-    spacing: 16pt
-    alignment: top
-  tvOS:
-    adaptive: { min: 260pt, max: 360pt }
-    spacing: 24pt
-    alignment: top
-grid_spacing:
-  ios: 16pt
-  tvOS: 24pt
-card_structure:
-  - poster: MoviePoster component
-  - duration_pill:
-      position: bottomTrailing
-      inset: 8pt
-      background: black(0.55)
-      text: white
-      padding: { h: 6pt, v: 3pt }
-      shape: capsule
-  - title:
-      font: { ios: subheadline, tvos: headline }
-      weight: semibold
-      lines: 2
-      alignment: leading
-focus_effect:
-  tvOS:
-    scale: 1.08
-    animation: easeInOut(0.2s)
-```
-
-### Shows Grid (Variable Sizes)
-```yaml
-type: LazyVGrid
-columns:
-  ios: 6 flexible, spacing: 16pt
-  tvOS: 4 flexible, spacing: 24pt
-card_sizes:
-  pattern: [large, medium, medium, medium, small, small, small, medium, medium, medium, medium, large]
-  small:
-    height: { ios: 160pt, tvos: 280pt }
-    column_span: 1
-  medium:
-    height: { ios: 200pt, tvos: 320pt }
-    column_span: 2
-  large:
-    height: { ios: 240pt, tvos: 380pt }
-    column_span: 3
-expansion_effect:
-  scale: 1.02
-  animation: spring(0.35, 0.8)
-```
-
-### MovieView Playback Screen
-```yaml
-backdrop:
-  type: LinearGradient
-  stops:
-    - { color: accentColor(0.45), location: 0.0 }
-    - { color: accentColor(0.18), location: 0.55 }
-    - { color: black(0.22), location: 1.0 }
-  direction: topLeading_to_bottomTrailing
-  fade_animation:
-    trigger: play_button
-    duration: 250ms
-    curve: easeInOut
-    opacity: 1.0 → 0.0
-overlay_controls:
-  title:
-    font: { ios: title, tvos: largeTitle }
-    weight: bold
-    shadow: { radius: 4pt }
-  play_button:
-    background: white
-    foreground: black
-    padding: { h: 18pt, v: 10pt }
-    shape: capsule
-    icon_offset: { playing: 0, paused: 2pt }
-  back_button:
-    icon: "chevron.left"
-    background: ultraThinMaterial
-    shape: circle
-    padding: 10pt
-  fullscreen_button:
-    icon: "arrow.up.left.and.arrow.down.right"
-    background: ultraThinMaterial
-    shape: capsule
-    padding: { h: 12pt, v: 8pt }
-```
-
-### Glass Playback Bar (WWDC 2025 Style)
-```yaml
-container:
-  background:
-    base: Color(white: 0.1, opacity: 0.8)
-    overlay: ultraThinMaterial(0.3)
-    corner_radius: 28pt
+glass_style:
+  material: .regularMaterial
+  corner_radius: 16pt (continuous)
+  shadow:
+    color: black(0.15)
+    radius: 20pt
+    offset: { x: 0, y: 8 }
   border:
     gradient: [white(0.2), white(0.05)]
     width: 0.5pt
-  shadow:
-    color: black(0.4)
-    radius: 20pt
-    x: 0
-    y: 10pt
-controls:
-  play_pause:
-    background:
-      shape: circle
-      fill: white(0.12)
-      size: 56pt
-    icon:
-      size: 26pt
-      weight: medium
-      offset: { play: 2pt, pause: 0 }
-  seek:
-    icon: "goforward/backward.10"
-    size: 26pt
-    spacing: 28pt
-  airplay:
-    icon: "airplayvideo"
-    size: 22pt
-    opacity: 0.9
-volume:
-  ios_macos:
-    track:
-      height: 4pt
-      fill: white(0.15)
-    progress:
-      height: 4pt
-      fill: white(0.7)
-    width: 120pt
-    gesture: drag
-  tvos:
-    buttons: [minus, percentage, plus]
-    spacing: 8pt
-    icon_size: 14pt
+
+internal_spacing:
+  padding: 16pt
+  section_gap: 0pt (divider separates)
+  content_inset: 16pt
+```
+
+### FileBrowser Visual Design
+
+```yaml
+list_style:
+  row_height: 
+    compact: 32pt
+    regular: 44pt
+  indentation: 20pt per level
+  icon_size: 
+    folder: 16pt
+    file: 14pt
+  spacing: 
+    icon_to_text: 8pt
+    horizontal_padding: 12pt
+    vertical_padding: 6pt
+
+folder_colors:
+  movies: purple
+  tv_shows: blue
+  default: secondary
+
+selection_style:
+  background: accentColor(0.15)
+  corner_radius: 6pt
+  animation: easeInOut(0.2s)
+
+hover_style:
+  background: secondary(0.05)
+  show_actions: true (ellipsis menu)
+```
+
+### Glass Button Style (Shared)
+
+```swift
+struct GlassButtonStyle: ButtonStyle {
+    // Ultra-thin material background
+    background: .ultraThinMaterial
+    corner_radius: 10pt (continuous)
+    padding: { h: 12pt, v: 8pt }
+    border: primary(0.08)
+    
+    // Pressed state
+    scale: 0.97
+    animation: easeOut(0.08s)
+}
+```
+
+## Color System
+
+### System Colors (Adaptive)
+
+| Element | Light Mode | Dark Mode | Usage |
+|---------|------------|-----------|-------|
+| **Inspector BG** | .systemBackground | black(0.95) | Panel background |
+| **Glass Material** | .regularMaterial | .ultraThinMaterial | Controls/overlays |
+| **List Selection** | .accentColor(0.2) | .accentColor(0.15) | Selected items |
+| **Hover State** | .secondary(0.1) | .secondary(0.05) | Mouse hover |
+| **Divider** | .separator | .separator | Section dividers |
+| **Icon Default** | .secondary | .secondary | Unselected icons |
+| **Folder Colors** | | | |
+| - Movies | .purple | .purple | Movies folder |
+| - TV Shows | .blue | .blue | TV Shows folder |
+| - Default | .secondary | .secondary | Regular folders |
+
+### Movie Poster Colors (Unchanged)
+
+```yaml
+poster_gradient:
+  fallback:
+    colors: [accentColor(0.55), accentColor(0.25), black(0.25)]
+    direction: topLeading → bottomTrailing
+  
+bottom_fade:
+  stops:
+    - { color: clear, location: 0.60 }
+    - { color: black(0.17), location: 0.82 }
+    - { color: black(0.28), location: 1.00 }
+
+duration_pill:
+  background: black(0.55)
+  text: white
+  padding: { h: 6pt, v: 3pt }
+```
+
+## Typography System
+
+### Inspector Typography
+
+| Style | Size | Weight | Usage |
+|-------|------|--------|-------|
+| **Panel Title** | .headline | .semibold | "Video Library" |
+| **Folder Name** | .system(13) | .regular | File/folder labels |
+| **File Info** | .system(11) | .regular | Size, date |
+| **Empty State** | .subheadline | .regular | "No videos found" |
+| **Button Label** | .system(14) | .semibold | Import/Create |
+
+### Grid Typography (Unchanged)
+
+| Style | iOS/macOS | tvOS | Weight | Usage |
+|-------|-----------|------|--------|-------|
+| **Grid Title** | .subheadline | .headline | .semibold | Poster labels |
+| **Duration** | .caption2 | .caption2 | .regular | Time pills |
+| **Empty Message** | .body | .title3 | .regular | No content |
+
+## Spacing & Layout
+
+### Inspector Layout
+
+```yaml
+inspector_panel:
+  total_width: { macOS: 320pt, iOS: 280pt }
+  content_sections:
+    outliner:
+      height: 75%
+      padding: 16pt
+      content: FileBrowser
+    
+    import:
+      height: 25%
+      padding: 8pt
+      background: .secondary(0.05)
+      content: ImportView (bookmarks)
+
+file_browser:
+  hierarchy:
+    root_indent: 0pt
+    child_indent: 20pt per level
+    max_depth: unlimited
+  
+  row_layout:
+    [indent] [chevron:16] [icon:20] [8pt] [name:flex] [info] [menu:20]
+```
+
+### Grid Layouts (Unchanged)
+
+```yaml
+movies_grid:
+  type: LazyVGrid
+  columns: adaptive(min: 140pt, max: 220pt)
+  spacing: 16pt
+  poster_aspect: 2:3
+
+shows_grid:
+  type: LazyVGrid
+  pattern: [large, medium, medium, small, small, small]
+  spacing: { h: 16pt, v: 16pt }
+```
+
+## Animation Specifications
+
+### Inspector Animations
+
+```yaml
+folder_expand:
+  trigger: chevron tap
+  animation: spring(response: 0.3, damping: 0.8)
+  chevron_rotation: 0° → 90°
+
+row_selection:
+  duration: 200ms
+  curve: easeInOut
+  background: transparent → accentColor(0.15)
+
+hover_state:
+  duration: 150ms
+  show_menu: true
+  background: transparent → secondary(0.05)
+
+import_sheet:
+  presentation: sheet
+  animation: spring(response: 0.45, damping: 0.9)
+```
+
+### Playback Animations (Unchanged)
+
+```yaml
+overlay_fade:
+  trigger: play state change
+  duration: 250ms
+  opacity: 1.0 → 0.0
+  curve: easeInOut
 ```
 
 ## Platform Visual Adaptations
 
 ### iOS
+
 ```yaml
-navigation: split_view_with_sidebar
-poster_sizes: 140-220pt
-shadows: subtle (0.12 opacity)
-corner_radii: 12pt standard
-fullscreen: sheet presentation
-gestures: drag for volume
-animations: standard iOS
+inspector:
+  width: 280pt
+  material: .regularMaterial
+  safe_area: respected
+
+navigation:
+  style: NavigationSplitView
+  column_visibility: automatic
+
+sheets:
+  document_picker: .pageSheet
+  fullscreen_video: .fullScreenCover
+
+gestures:
+  context_menu: long press
+  selection: tap
+  expand: tap chevron
 ```
 
 ### tvOS
+
 ```yaml
-navigation: stack (no split)
-poster_sizes: 260-360pt (1.5-1.8x iOS)
-shadows: enhanced (0.30 opacity)
-corner_radii: 18pt (1.5x iOS)
+inspector:
+  merged_with_content: true
+  max_height: 360pt
+  focus_indicators: enhanced
+
 focus_effects:
-  scale: 1.08-1.10
+  scale: 1.08
   animation: 200ms
-  material_change: regular when focused
-controls: button-based (no drag)
+  shadow: enhanced
+
+navigation:
+  style: NavigationStack
+  remote_control: directional
 ```
 
 ### macOS
+
 ```yaml
-navigation: split_view
-titlebar_spacing: 28pt (traffic lights)
-window_chrome: native
-fullscreen: window toggle
-hover_states: enabled
-cursor: pointer on interactive
-shadows: same as iOS
+inspector:
+  width: 320pt
+  traffic_light_spacing: 28pt
+  material: .regularMaterial
+
+window:
+  style: native
+  fullscreen: native toggle
+  toolbar: unified
+
+interactions:
+  hover: enabled
+  right_click: context menu
+  cursor: changes on hover
 ```
 
-## Animation Specifications
+## Glass Design System Details
 
-### Standard Timings
+### Material Hierarchy
+
 ```yaml
-instant: 0ms
-fast: 100ms
-normal: 200ms
-smooth: 250ms
-slow: 350ms
-dramatic: 500ms
+levels:
+  base: 
+    - .regularMaterial (Inspector panel)
+  overlay_1:
+    - .ultraThinMaterial (Controls, buttons)
+  overlay_2:
+    - .thinMaterial (Popovers, menus)
+  overlay_3:
+    - .thickMaterial (Modals, sheets)
 ```
 
-### Poster Focus (tvOS)
+### Border & Shadow System
+
 ```yaml
-trigger: @FocusState change
-properties:
-  scale: 1.0 → 1.08
-  shadow: enhanced
-duration: 200ms
-curve: easeInOut
+borders:
+  standard:
+    gradient: [white(0.2) top, white(0.05) bottom]
+    width: 0.5pt
+    corner_radius: continuous
+  
+  selected:
+    color: accentColor
+    width: 2pt
+    corner_radius: continuous
+
+shadows:
+  ambient:
+    color: black(0.1)
+    radius: 10pt
+    offset: { x: 0, y: 2 }
+  
+  key_light:
+    color: black(0.15)
+    radius: 20pt
+    offset: { x: 0, y: 8 }
+  
+  focus_ring:
+    color: accentColor(0.4)
+    radius: 4pt
+    offset: { x: 0, y: 0 }
 ```
 
-### Playback Overlay Fade
-```yaml
-trigger: isPlaying state change
-targets:
-  - backdrop gradient
-  - overlay controls
-  - title/buttons
-opacity: 1.0 → 0.0
-duration: 250ms
-curve: easeInOut
-```
+## Icon System
 
-### Grid Card Tap (Shows)
-```yaml
-trigger: tap gesture
-scale: 1.0 → 1.02
-duration: 200ms
-curve: spring(response: 0.35, damping: 0.8)
-```
+### SF Symbols Usage
 
-### Volume Adjust
+| Icon | Symbol | Size | Context |
+|------|--------|------|---------|
+| **Folder** | folder.fill | 16pt | Directory |
+| **Movies** | film.fill | 16pt | Movies folder |
+| **TV Shows** | tv.fill | 16pt | Shows folder |
+| **Video** | play.rectangle.fill | 14pt | Video file |
+| **Chevron** | chevron.right/down | 10pt | Expand/collapse |
+| **Menu** | ellipsis.circle | 12pt | Context menu |
+| **Import** | square.and.arrow.down | 16pt | Add folder |
+| **Create** | plus.circle | 14pt | New item |
+
+### Icon Colors
+
 ```yaml
-trigger: drag or button
-feedback: haptic (iOS)
-animation: none (real-time)
+folders:
+  movies: purple
+  tv_shows: blue
+  default: secondary
+
+files:
+  video: green
+  other: secondary
+
+states:
+  selected: white (on accent)
+  hover: primary
+  default: secondary
 ```
 
 ## Visual Polish Details
 
-### Poster Quality
-- Format: JPEG
-- Compression: 0.85
-- Max dimensions: 1200x1800
-- Frame selection: 10% into video
-- Color space: sRGB
-- Transform: Applied for orientation
+### Corner Radius System
 
-### Glass Effects
+| Component | Radius | Style |
+|-----------|--------|-------|
+| **Inspector Panel** | 16pt | continuous |
+| **List Selection** | 6pt | continuous |
+| **Buttons** | 10pt | continuous |
+| **Posters** | 12pt | continuous |
+| **Pills** | full | capsule |
+| **Sheets** | 20pt | continuous |
+
+### Blur Effects
+
 ```yaml
-materials:
-  ultra_thin: opacity(0.3), blur(20)
-  regular: opacity(0.5), blur(30)
-  thick: opacity(0.8), blur(40)
-borders:
-  gradient: top(light) to bottom(dark)
-  width: 0.5pt
-shadows:
-  multiple: true
-  layers: [ambient, key_light]
+glass_blur:
+  ultra_thin: 20pt radius
+  thin: 30pt radius
+  regular: 40pt radius
+  thick: 50pt radius
+  
+background_blur:
+  video_overlay: 60pt
+  sheet_backdrop: 80pt
 ```
 
-### Typography Polish
-- Monospaced digits: Duration displays
-- Line limits: 2 for titles
-- Truncation: tail
-- Alignment: leading for cards, center for overlays
-- Kerning: default
-- Dynamic Type: supported
+## Accessibility Visual Design
 
-## Accessibility
+### Contrast Requirements
 
-### Contrast Ratios
-- Text on dark: 7:1 minimum
-- Controls: 4.5:1 minimum
+- Text on glass: 7:1 minimum
+- Icons on glass: 4.5:1 minimum
 - Focus indicators: 3:1 minimum
+- Selection states: clearly visible
 
-### Motion
-- Respects reduce motion
-- Alternative: instant transitions
-- Focus visible: always
+### Focus Indicators
+
+```yaml
+keyboard_focus:
+  style: ring
+  color: accentColor
+  width: 2pt
+  offset: 2pt
+
+voiceover_focus:
+  style: bold ring
+  color: white
+  width: 3pt
+  background: black(0.8)
+```
+
+### Reduce Motion
+
+When enabled:
+- Instant transitions (no animation)
+- No parallax effects
+- Static backgrounds
+- Simple fades only
+
+## Visual Issues & Improvements
+
+### Current Issues ⚠️
+
+1. **ImportView Misleading**
+   - Looks like import but manages bookmarks
+   - Needs visual redesign to match function
+
+2. **Mixed Paradigms**
+   - File browser aesthetic
+   - Import-style buttons
+   - Confusing visual language
+
+3. **Performance**
+   - Poster generation blocks UI
+   - No loading indicators
+   - Synchronous operations visible
+
+### Proposed Visual Improvements
+
+1. **Rename & Redesign ImportView**
+```yaml
+new_design:
+  title: "External Folders"
+  icon: folder.badge.plus
+  style: list of bookmarks
+  action: "Add Folder" not "Import"
+```
+
+2. **Loading States**
+```yaml
+directory_loading:
+  style: progress spinner
+  position: inline with folder
+  size: 14pt
+
+poster_loading:
+  style: skeleton
+  shimmer: true
+  duration: 1s
+```
+
+3. **Unified Visual Language**
+- Remove import iconography
+- Use folder/file metaphors consistently
+- Clear browse vs play states
 
 ## Design Principles
 
-1. **DVD Library Aesthetic**: Physical media metaphor
-2. **Progressive Disclosure**: Details on interaction
-3. **Platform Native**: Respect each OS
-4. **Depth Through Layers**: Multi-level shadows
-5. **Purposeful Motion**: Guide attention
-6. **Subtle Glass**: Modern without distraction
-7. **Content First**: UI recedes during playback
+1. **Glass Transparency**: Subtle materials that don't distract
+2. **Folder Metaphor**: Filesystem navigation is primary
+3. **DVD Library**: 2:3 posters maintain physical media feel
+4. **Platform Native**: Respect each OS's conventions
+5. **Progressive Disclosure**: Details on interaction
+6. **Content Focus**: UI recedes during playback
+7. **Accessibility First**: Clear focus, high contrast options
+
+## Visual Testing Checklist
+
+- [ ] Glass materials render correctly
+- [ ] Focus states visible on all platforms
+- [ ] Hover states work on macOS
+- [ ] tvOS focus scaling smooth
+- [ ] Dark/light mode transitions
+- [ ] Poster loading doesn't block
+- [ ] Animations respect reduce motion
+- [ ] Text remains legible on glass
+- [ ] Icons have sufficient contrast

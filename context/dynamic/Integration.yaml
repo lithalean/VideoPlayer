@@ -1,403 +1,451 @@
-# VideoPlayer Integration Context
-# Version: 1.0
-# Last Updated: 2025-08-12
+# VideoPlayer Integration Configuration
+# Version: 2.0
+# Last Updated: September 2025
+# Purpose: Document all external dependencies and system integrations
 
-integration_summary:
-  total_integrations: 6
-  ready: 6
-  in_progress: 0
-  planned: 3
+# ============================================================================
+# SYSTEM FRAMEWORKS
+# ============================================================================
 
-# Framework Dependencies
-framework_dependencies:
-  SwiftUI:
-    version: "iOS 17.0+"
-    status: "integrated"
-    purpose: "Primary UI framework"
-    usage:
-      - "All view components"
-      - "Navigation system" 
-      - "State management (@State, @Published)"
-      - "Platform conditionals"
-    critical_apis:
-      - "NavigationSplitView"
-      - "NavigationStack"
-      - "LazyVGrid"
-      - "@FocusState (tvOS)"
-      - "fileImporter"
-  
-  SwiftData:
-    version: "iOS 17.0+"
-    status: "integrated"
-    purpose: "Persistence layer"
-    usage:
-      - "VPVideo model storage"
-      - "@Query for library items"
-      - "ModelContainer/Context"
-      - "Predicate filtering"
-    known_issues:
-      - "Enum predicates crash - using kindRaw workaround"
-      - "Cannot query enum.rawValue in predicates"
-      - "Macro compilation differences across platforms"
-    workarounds:
-      - "Store kindRaw string alongside enum"
-      - "Use string literals in predicates"
-  
-  AVKit:
-    version: "System"
-    status: "integrated"
-    purpose: "Video playback UI"
-    usage:
-      - "VideoPlayer view wrapper"
-      - "System video controls"
-      - "Platform-appropriate chrome"
-    implementation:
-      - "VideoPlayer(player: AVPlayer)"
-      - "Minimal custom controls"
-  
-  AVFoundation:
-    version: "System"
-    status: "integrated"
-    purpose: "Media processing"
-    usage:
-      - "AVPlayer for playback"
-      - "AVAsset for metadata extraction"
-      - "AVAssetImageGenerator for posters"
-      - "AVPlayerItem for queue (future)"
-    critical_apis:
-      - "AVURLAsset(url:)"
-      - "asset.duration"
-      - "asset.tracks(withMediaType: .video)"
-      - "track.naturalSize"
-      - "track.preferredTransform"
-      - "generator.copyCGImage(at:actualTime:)"
-  
-  UniformTypeIdentifiers:
-    version: "System"
-    status: "integrated"
-    purpose: "File type validation"
-    usage:
-      - ".mpeg4Movie for M4V files"
-      - "UTType.jpeg for poster storage"
-      - "Type conformance checking"
-    implementation:
-      - "allowedContentTypes: [.mpeg4Movie]"
-      - "UTType(filenameExtension:)"
-      - "type.conforms(to: .mpeg4Movie)"
-  
-  CoreGraphics:
-    version: "System"
-    status: "integrated"
-    purpose: "Image processing"
-    usage:
-      - "CGImageDestination for JPEG writing"
-      - "CGImage manipulation"
-      - "Transform calculations"
-    critical_apis:
-      - "CGImageDestinationCreateWithURL"
-      - "CGImageDestinationAddImage"
-      - "CGImageDestinationFinalize"
-      - "CGSize applying transforms"
+frameworks:
+  apple:
+    required:
+      - name: SwiftUI
+        version: "5.0+"
+        usage: "Core UI framework"
+        platforms: [iOS, tvOS, macOS]
+      
+      - name: AVFoundation
+        version: "iOS 17.0+"
+        usage: "Video playback, metadata extraction"
+        platforms: [iOS, tvOS, macOS]
+        classes:
+          - AVPlayer
+          - AVAsset
+          - AVAssetImageGenerator
+          - AVPlayerItem
+      
+      - name: AVKit
+        version: "iOS 17.0+"
+        usage: "VideoPlayer view component"
+        platforms: [iOS, tvOS, macOS]
+        components:
+          - VideoPlayer
+      
+      - name: Foundation
+        version: "iOS 17.0+"
+        usage: "File operations, URL handling"
+        platforms: [iOS, tvOS, macOS]
+        key_apis:
+          - FileManager
+          - URL
+          - URLResourceKey
+          - NSFileCoordinator
+      
+      - name: UniformTypeIdentifiers
+        version: "iOS 14.0+"
+        usage: "File type validation"
+        platforms: [iOS, tvOS, macOS]
+        types:
+          - UTType.mpeg4Movie
+          - UTType.folder
+          - UTType.item
+      
+      - name: SwiftData
+        version: "iOS 17.0+"
+        usage: "Legacy persistence (to be removed)"
+        platforms: [iOS, tvOS, macOS]
+        status: "DEPRECATED - Remove in v3.0"
+        current_usage:
+          - VPVideo model
+          - @Query in MoviesView/ShowsView
+          - Poster URL generation
+    
+    platform_specific:
+      iOS:
+        - name: UIKit
+          usage: "Document picker, haptics"
+          components:
+            - UIDocumentPickerViewController
+            - UIImpactFeedbackGenerator
+            - UIPasteboard
+        
+        - name: MobileCoreServices
+          usage: "UTI support"
+          status: "Legacy, use UniformTypeIdentifiers"
+      
+      macOS:
+        - name: AppKit
+          usage: "Native macOS features"
+          components:
+            - NSWorkspace
+            - NSPasteboard
+            - NSAppleScript
+            - NSCursor
+            - NSColor
+      
+      tvOS:
+        - name: TVUIKit
+          usage: "Focus engine"
+          components:
+            - Focus system
+            - Remote control handling
 
-# Platform Capabilities
-platform_capabilities:
-  ios:
-    minimum_version: "17.0"
-    features:
-      fileImporter: 
-        status: "integrated"
-        usage: "System file picker for .m4v"
-      drag_gestures: 
-        status: "integrated"
-        usage: "Volume slider control"
-      sheets: 
-        status: "integrated"
-        usage: "Fullscreen video presentation"
-      context_menus: 
-        status: "integrated"
-        usage: "Delete actions on posters"
-      split_view:
-        status: "integrated"
-        usage: "Sidebar navigation"
-    limitations: []
-  
-  tvos:
-    minimum_version: "17.0"
-    features:
-      focus_engine:
-        status: "integrated"
-        usage: "Grid navigation with remote"
-      button_controls:
-        status: "integrated"
-        usage: "Volume adjustment (no drag)"
-      larger_ui:
-        status: "integrated"
-        usage: "1.5-1.8x scaling for TV"
-    limitations:
-      - no_file_import: "No local file access API"
-      - no_drag_gestures: "Focus-based interaction only"
-      - no_context_menus: "Use buttons instead"
-      - no_split_view: "Stack navigation only"
-  
-  macos:
-    minimum_version: "14.0"
-    features:
-      window_fullscreen:
-        status: "integrated"
-        usage: "NSApp.windows.first?.toggleFullScreen"
-      sidebar:
-        status: "integrated"
-        usage: "System sidebar style"
-      traffic_lights:
-        status: "integrated"
-        usage: "28pt titlebar spacing"
-      hover_states:
-        status: "integrated"
-        usage: "Desktop interactions"
-      keyboard:
-        status: "planned"
-        usage: "Shortcuts for playback"
-    limitations: []
+# ============================================================================
+# FILE SYSTEM INTEGRATION
+# ============================================================================
 
-# File System Integration
-file_system:
-  app_container:
+filesystem:
+  operations:
+    - name: "FileManager"
+      methods:
+        - contentsOfDirectory(at:includingPropertiesForKeys:options:)
+        - createDirectory(at:withIntermediateDirectories:attributes:)
+        - removeItem(at:)
+        - moveItem(at:to:)
+        - copyItem(at:to:)
+        - fileExists(atPath:)
+      
+    - name: "URL"
+      methods:
+        - startAccessingSecurityScopedResource()
+        - stopAccessingSecurityScopedResource()
+        - bookmarkData(options:includingResourceValuesForKeys:relativeTo:)
+        - resourceValues(forKeys:)
+  
+  security:
+    iOS:
+      required_capabilities:
+        - security_scoped_bookmarks
+        - document_picker_access
+        - files_app_visibility
+      
+      bookmark_storage:
+        location: UserDefaults
+        format: Data
+        keys: "bookmark_[folderName]"
+    
+    macOS:
+      sandbox_entitlements:
+        - com.apple.security.files.user-selected.read-only
+        - com.apple.security.app-sandbox
+    
+    tvOS:
+      limitations:
+        - sandbox_only
+        - no_external_storage
+        - no_document_picker
+
+  directories:
     structure:
-      videos: "Library/Videos/"
-      posters: "Library/Application Support/[BundleID]/Posters/"
-    permissions:
-      videos: "read-write"
-      posters: "read-write"
-  
-  import_process:
-    source: "User selected via fileImporter"
-    validation:
-      extension: ".m4v required"
-      type: "Must conform to .mpeg4Movie"
-    copy_method: "NSFileCoordinator"
-    naming: "Unique with incrementing suffix"
-    steps:
-      1: "Security scoped access"
-      2: "Validate format"
-      3: "Coordinate copy"
-      4: "Extract metadata"
-      5: "Generate poster"
-      6: "Save to SwiftData"
-  
-  deletion:
-    removes_file: true
-    removes_record: true
-    removes_poster: false  # Known issue - orphaned
-    coordinated: true
-
-# Data Flow Integration
-data_flow:
-  import_pipeline:
-    1_validate: "Check M4V format"
-    2_access: "startAccessingSecurityScopedResource"
-    3_copy: "Coordinated copy to app container"
-    4_extract: "AVAsset metadata (sync)"
-    5_persist: "Create VPVideo in SwiftData"
-    6_generate: "Poster from 10% timestamp"
-    7_cleanup: "stopAccessingSecurityScopedResource"
-  
-  playback_flow:
-    1_resolve: "absoluteURL from VPVideo.fileName"
-    2_create: "AVPlayer(url:)"
-    3_present: "VideoPlayer view"
-    4_control: "Service methods"
-    5_cleanup: "player.pause() on disappear"
-
-# Service Integration
-services:
-  VideoImportService:
-    pattern: "Singleton"
-    thread: "@MainActor"
-    responsibilities:
-      - "File validation"
-      - "Coordinated import"
-      - "Metadata extraction"
-      - "File deletion"
-      - "URL resolution"
-    public_api:
-      - "importFile(at:kind:modelContext:)"
-      - "delete(video:modelContext:)"
-      - "absoluteURL(for:)"
-  
-  VideoPlayerService:
-    pattern: "Singleton"
-    thread: "@MainActor"
-    responsibilities:
-      - "AVPlayer lifecycle"
-      - "Playback state"
-      - "Volume control"
-      - "Seek operations"
-    public_api:
-      - "load(url:title:)"
-      - "togglePlayback()"
-      - "seek(by:)"
-      - "volume: Float"
-      - "isPlaying: Bool"
-
-# Future Integrations
-future_integrations:
-  AirPlay:
-    priority: "HIGH"
-    timeline: "Next sprint"
-    requirements:
-      - "AVRoutePickerView wrapper"
-      - "Route change detection"
-      - "UI updates for casting state"
-    implementation:
-      - "SwiftUI wrapper for AVRoutePickerView"
-      - "Observe route changes"
-      - "Update UI when casting"
-    blockers: []
-  
-  CloudKit:
-    priority: "MEDIUM"
-    timeline: "Q4 2025"
-    requirements:
-      - "Library metadata sync"
-      - "Poster image sync"
-      - "Watch history sync"
-      - "Settings sync"
-    implementation:
-      - "CKRecord for VPVideo"
-      - "CKAsset for posters"
-      - "Conflict resolution"
-    blockers:
-      - "Need iCloud entitlements"
-      - "Storage costs"
-  
-  SharePlay:
-    priority: "LOW"
-    timeline: "2026"
-    requirements:
-      - "GroupActivities framework"
-      - "Synchronized playback"
-      - "Shared queue"
-    implementation:
-      - "GroupActivity for videos"
-      - "Playback sync protocol"
-      - "UI for participants"
-    blockers:
-      - "Complex implementation"
-      - "Testing requirements"
-
-# Security & Permissions
-security:
-  entitlements:
-    com.apple.security.app-sandbox: true
-    com.apple.security.files.user-selected.read-only: true
-  
-  file_access:
-    import:
-      method: "Security scoped URL"
-      duration: "Import operation only"
-    playback:
-      method: "Direct file URL"
-      location: "App container"
-    export:
-      method: "Not implemented"
-      future: "Document picker"
-  
-  privacy:
-    camera: false
-    microphone: false
-    photos: false
-    location: false
+      Documents/:
+        VideoPlayer/:
+          Movies/:
+            description: "Movie files (.m4v)"
+            auto_created: true
+          TV Shows/:
+            description: "TV show files (.m4v)"
+            auto_created: true
     
-# Performance Considerations
-performance:
-  current_bottlenecks:
+    application_support:
+      "[BundleID]/":
+        Posters/:
+          description: "Cached poster images"
+          format: "JPEG"
+          naming: "[videoID].jpg"
+        VideoLibrary/:
+          description: "Legacy imported videos"
+          status: "DEPRECATED"
+
+# ============================================================================
+# MEDIA HANDLING
+# ============================================================================
+
+media:
+  supported_formats:
+    video:
+      - extension: .m4v
+        uti: public.mpeg-4
+        mime: video/x-m4v
+        required: true
+        exclusive: true
+  
+  metadata_extraction:
+    AVAsset_properties:
+      - duration
+      - tracks
+      - naturalSize
+      - preferredTransform
+      - metadata
+    
     poster_generation:
-      impact: "200-500ms UI block"
-      severity: "medium"
-      solution: "Move to background queue"
-    
-    large_imports:
-      impact: "No progress indication"
-      severity: "low"
-      solution: "Add progress UI"
+      time_offset: "10% of duration"
+      max_size: {width: 1200, height: 1800}
+      format: JPEG
+      quality: 0.85
+      blocking: true  # TODO: Make async
   
-  optimizations:
-    grid_rendering:
-      method: "LazyVGrid"
-      status: "optimal"
-    
-    memory:
-      video: "Single AVPlayer instance"
-      posters: "Filesystem cache"
-      models: "SwiftData lazy loading"
-    
-    startup:
-      cold: "~500ms"
-      warm: "~200ms"
-      bottleneck: "SwiftData initialization"
+  playback:
+    engine: AVPlayer
+    features:
+      - play/pause
+      - seek
+      - volume
+      - currentTime
+    limitations:
+      - no_pip
+      - no_airplay
+      - no_subtitles
+      - no_chapters
 
-# Error Handling
-error_handling:
-  import_errors:
-    unsupportedType: "Show alert"
-    copyFailed: "Log and skip"
-    metadataFailed: "Use defaults"
-    fileAttributesMissing: "Use defaults"
-  
-  playback_errors:
-    file_not_found: "Show error view"
-    codec_unsupported: "Shouldn't happen (M4V only)"
-    network_error: "N/A (local only)"
-  
-  recovery:
-    corrupted_database: "Reset SwiftData"
-    missing_files: "Remove orphaned records"
-    poster_generation_failed: "Show gradient"
+# ============================================================================
+# USER INTERFACE INTEGRATION
+# ============================================================================
 
-# Testing Integration
-testing:
-  unit_tests:
-    coverage: 0
-    framework: "XCTest"
-    priority_areas:
-      - "Import validation"
-      - "Metadata extraction"
-      - "File coordination"
+ui_integration:
+  navigation:
+    iOS:
+      type: NavigationSplitView
+      column_width: {min: 200, ideal: 240, max: 300}
+      presentations:
+        - sheet
+        - fullScreenCover
+    
+    tvOS:
+      type: NavigationStack
+      focus: FocusState
+      remote_control: true
+    
+    macOS:
+      type: NavigationSplitView
+      window_style: native
+      fullscreen: toggleFullScreen
   
-  ui_tests:
-    coverage: 0
-    framework: "XCUITest"
-    priority_areas:
-      - "Import flow"
-      - "Playback controls"
-      - "Navigation"
+  materials:
+    glass_design:
+      - .regularMaterial
+      - .ultraThinMaterial
+      - .thinMaterial
+      - .thickMaterial
+    
+    blur_effects:
+      radius: [20, 30, 40, 50]
+      vibrancy: true
   
-  integration_tests:
-    coverage: 0
-    areas:
-      - "SwiftData persistence"
-      - "File system operations"
-      - "AVPlayer lifecycle"
+  animations:
+    spring:
+      response: 0.35
+      damping: 0.8
+    
+    easeInOut:
+      duration: 0.25
+    
+    fade:
+      duration: 0.25
 
-# Build Integration
+# ============================================================================
+# PLATFORM INTEGRATION
+# ============================================================================
+
+platform_integration:
+  info_plist:
+    required_keys:
+      iOS:
+        - key: UIFileSharingEnabled
+          value: true
+          reason: "Files app visibility"
+        
+        - key: LSSupportsOpeningDocumentsInPlace
+          value: true
+          reason: "Direct file access"
+        
+        - key: UISupportsDocumentBrowser
+          value: true
+          reason: "Document browser support"
+      
+      macOS:
+        - key: LSMinimumSystemVersion
+          value: "$(MACOSX_DEPLOYMENT_TARGET)"
+    
+    document_types:
+      - name: "MPEG-4 Video"
+        role: Viewer
+        types: [public.mpeg-4]
+        extensions: [m4v]
+  
+  entitlements:
+    all_platforms:
+      - com.apple.security.app-sandbox: true
+      - com.apple.security.files.user-selected.read-only: true
+    
+    macOS:
+      - com.apple.security.files.downloads.read-only: false
+      - com.apple.security.assets.movies.read-only: false
+
+# ============================================================================
+# EXTERNAL DEPENDENCIES
+# ============================================================================
+
+dependencies:
+  swift_packages: []  # No external packages
+  
+  cocoapods: []  # Not using CocoaPods
+  
+  system_binaries: []  # No external binaries
+
+# ============================================================================
+# BUILD CONFIGURATION
+# ============================================================================
+
 build:
-  xcode:
-    version: "15.0+"
-    project: "VideoPlayer.xcodeproj"
+  minimum_deployment:
+    iOS: "17.0"
+    tvOS: "17.0"
+    macOS: "14.0"
   
-  swift:
-    version: "5.9+"
-    strict_concurrency: false
-    
-  deployment:
-    ios: "17.0"
-    tvos: "17.0"
-    macos: "14.0"
+  swift_version: "5.9"
   
-  configuration:
-    debug:
-      optimization: "-Onone"
-      strip_symbols: false
+  xcode_version: "15.0+"
+  
+  compiler_flags:
     release:
-      optimization: "-O"
-      strip_symbols: true
+      - -O  # Optimization
+      - -whole-module-optimization
+    
+    debug:
+      - -Onone
+      - -D DEBUG
+  
+  linker_flags: []
+  
+  strip_symbols: true
+
+# ============================================================================
+# TESTING INTEGRATION
+# ============================================================================
+
+testing:
+  frameworks:
+    - XCTest
+    - XCUITest
+  
+  coverage_targets:
+    - Core/
+    - Inspector/
+    - Services/
+  
+  mock_requirements:
+    - FileManager operations
+    - Security-scoped resources
+    - AVPlayer states
+  
+  ui_test_requirements:
+    - Document picker interaction
+    - Focus navigation (tvOS)
+    - Keyboard shortcuts (future)
+
+# ============================================================================
+# PERFORMANCE MONITORING
+# ============================================================================
+
+performance:
+  instruments:
+    - Time Profiler
+    - Allocations
+    - System Trace
+    - File Activity
+  
+  metrics:
+    - app_launch_time: "<1s"
+    - directory_enumeration: "<100ms for 1000 files"
+    - poster_generation: "TODO: Make async"
+    - memory_baseline: "<50MB"
+  
+  bottlenecks:
+    - poster_generation_blocks_ui
+    - synchronous_file_operations
+    - swiftdata_queries_unnecessary
+
+# ============================================================================
+# DEPRECATION TIMELINE
+# ============================================================================
+
+deprecation:
+  v2.1:
+    - component: ImportView
+      action: "Rename to BookmarkView"
+      reason: "Misleading name"
+    
+    - component: VideoImportService.importFile
+      action: "Remove import functionality"
+      reason: "No longer copying files"
+  
+  v3.0:
+    - component: SwiftData
+      action: "Complete removal"
+      reason: "Filesystem-only approach"
+      affects:
+        - VPVideo model
+        - @Query in views
+        - ModelContainer setup
+    
+    - component: VideoImportService
+      action: "Complete removal"
+      reason: "No longer needed"
+  
+  v4.0:
+    - component: Legacy poster system
+      action: "Replace with async cache"
+      reason: "Performance improvement"
+
+# ============================================================================
+# INTEGRATION ISSUES
+# ============================================================================
+
+known_issues:
+  - issue: "SwiftData queries still active"
+    severity: medium
+    impact: "Unnecessary overhead"
+    resolution: "Remove in v3.0"
+  
+  - issue: "Poster generation synchronous"
+    severity: high
+    impact: "UI blocking"
+    resolution: "Make async with Task"
+  
+  - issue: "No file watching"
+    severity: low
+    impact: "Manual refresh needed"
+    resolution: "Add FSEvents/NSFilePresenter"
+  
+  - issue: "ImportView misnamed"
+    severity: medium
+    impact: "User confusion"
+    resolution: "Rename in v2.1"
+
+# ============================================================================
+# FUTURE INTEGRATIONS
+# ============================================================================
+
+future:
+  planned:
+    - name: "CloudKit"
+      purpose: "Sync bookmarks across devices"
+      timeline: "v3.0"
+    
+    - name: "Quick Look"
+      purpose: "Preview without playback"
+      timeline: "v2.5"
+    
+    - name: "Shortcuts"
+      purpose: "Automation support"
+      timeline: "v3.5"
+  
+  considered:
+    - name: "Metal"
+      purpose: "Custom video effects"
+      timeline: "Unknown"
+    
+    - name: "Network.framework"
+      purpose: "SMB/streaming support"
+      timeline: "v4.0"

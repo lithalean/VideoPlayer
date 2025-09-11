@@ -1,202 +1,252 @@
 # VideoPlayer Navigation Context
 
-**Purpose**: Screen flow, user journeys, and navigation patterns  
-**Version**: 1.0  
-**Navigation Pattern**: Split View (iOS/macOS) + Stack (tvOS)  
-**Last Updated**: August 12, 2025
+**Purpose**: Document the Inspector-based navigation system and user flows  
+**Version**: 2.0  
+**Navigation Pattern**: Inspector Panel + Detail View  
+**Last Updated**: September 2025
 
-## Navigation State Machine
+## Navigation Architecture
+
+### Core Structure
 ```
-┌─────────┐     Import     ┌──────────┐
-│  Empty  │ ───────────────►│ Library  │
-│ Library │                 │(Has Items)│
-└─────────┘                 └─────┬────┘
-                                  │
-                    ┌─────────────┴──────────────┐
-                    ▼                            ▼
-            ┌──────────┐                ┌──────────┐
-            │  Movies  │                │  Shows   │
-            │   Grid   │                │   Grid   │
-            └────┬─────┘                └────┬─────┘
-                 │ Tap Poster                 │ Tap Card
-                 ▼                            ▼
-            ┌──────────┐                ┌──────────┐
-            │MovieView │                │(ShowView)│
-            │(Playback)│                │ [Future] │
-            └────┬─────┘                └──────────┘
-                 │ Fullscreen
-                 ▼
-            ┌──────────┐
-            │Fullscreen│
-            │  Video   │
-            └──────────┘
+┌─────────────────────────────────────────────────┐
+│                  ContentView                     │
+│  ┌──────────────┐ ┌──────────────────────────┐  │
+│  │ Inspector    │ │      Detail View         │  │
+│  │   Panel      │ │                          │  │
+│  │              │ │  ┌──────────────────┐    │  │
+│  │ ┌──────────┐ │ │  │                  │    │  │
+│  │ │Outliner  │ │ │  │   MoviesView     │    │  │
+│  │ │   75%    │ │ │  │       or         │    │  │
+│  │ │          │ │ │  │   ShowsView      │    │  │
+│  │ └──────────┘ │ │  │       or         │    │  │
+│  │              │ │  │   MovieView      │    │  │
+│  │ ┌──────────┐ │ │  │   (playback)     │    │  │
+│  │ │Import    │ │ │  │                  │    │  │
+│  │ │   25%    │ │ │  └──────────────────┘    │  │
+│  │ └──────────┘ │ │                          │  │
+│  └──────────────┘ └──────────────────────────┘  │
+│     280-320pt            Remaining space         │
+└─────────────────────────────────────────────────┘
 ```
 
-## Screen Hierarchy
+## Platform-Specific Navigation
 
-### iOS/macOS Structure
-```
-NavigationSplitView
-├── Sidebar (200-300pt width)
-│   ├── Library Section
-│   │   ├── Movies (NavigationItem)
-│   │   └── Shows (NavigationItem)
-│   └── Import Controls (pinned bottom)
-│       ├── Import Menu
-│       │   ├── Kind Picker (Movie/Show)
-│       │   └── Choose Files Button
-│       └── Quick Import Button
-└── Detail View
-    ├── MoviesView (when Movies selected)
-    ├── ShowsView (when Shows selected)
-    └── Empty State (nothing selected)
+### iOS/macOS NavigationSplitView
+```swift
+NavigationSplitView(columnVisibility: .constant(.automatic)) {
+    InspectorPanel()
+        .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 300)
+} detail: {
+    detailView  // MoviesView, ShowsView, or placeholder
+}
 ```
 
-### tvOS Structure
-```
-NavigationStack
-└── VStack
-    ├── VideoPlayerNavigationSidebar (max 360pt)
-    │   ├── Library Items
-    │   └── (No import - tvOS limitation)
-    ├── Divider
-    └── Detail View (remaining space)
-        ├── MoviesView
-        ├── ShowsView
-        └── Empty State
+### tvOS NavigationStack
+```swift
+NavigationStack {
+    VStack(spacing: 0) {
+        VideoPlayerNavigationSidebar(selection: $selection)
+            .frame(maxHeight: 360)
+        Divider()
+        detailView
+    }
+}
 ```
 
 ## User Journey Flows
 
-### First Launch → First Video
+### First Launch Flow
 ```
-1. App Opens → Empty Library State
-2. User sees "No Movies" message with film icon
-3. Clicks Import button (iOS/macOS only)
-4. Menu appears → Selects Movie or Show kind
-5. "Choose .m4v Files" → System file picker
-6. Selects one or multiple .m4v files
-7. Import begins (async, no progress shown)
-8. Poster generates at 10% timestamp
-9. Video appears in appropriate grid
-10. User taps poster → MovieView opens
-11. Taps Play → Overlay fades, video plays
+1. App Opens
+   └── Empty Documents/VideoPlayer/
+       ├── Auto-creates "Movies" folder
+       ├── Auto-creates "TV Shows" folder
+       └── Shows empty state in Detail View
+
+2. User Interaction Options:
+   a. iOS: Tap Import → Document Picker → Select folder
+   b. macOS: Browse filesystem directly
+   c. tvOS: Limited to sandbox (no import)
 ```
 
-### Browse → Watch Flow
+### Browse → Play Flow
 ```
-1. App opens → Sidebar shows badge counts
-2. User selects Movies from sidebar
-3. Grid of 2:3 posters appears
-4. User scrolls to find video
-5. Taps poster (tvOS: focuses then selects)
-6. MovieView opens with backdrop gradient
-7. Sees title and Play button overlay
-8. Taps Play → UI fades out
-9. Video plays fullscreen
-10. Taps Back to return to grid
+1. InspectorPanel (Left)
+   └── OutlinerView
+       └── FileBrowser
+           ├── Documents/
+           └── VideoPlayer/
+               ├── 📁 Movies/      → Tap → Navigate to MoviesView
+               │   └── movie.m4v  → Tap → Play directly
+               └── 📁 TV Shows/   → Tap → Navigate to ShowsView
+                   └── show.m4v   → Tap → Play directly
+
+2. Detail View Updates
+   - Folder selected → Show grid view
+   - File selected → Open MovieView with AVPlayer
 ```
 
-### Import Flow (iOS/macOS)
+### iOS Security-Scoped Flow
 ```
-1. Import controls visible at sidebar bottom
-2. User taps import menu
-3. Selects kind: Movie or Show
-4. Taps "Choose .m4v Files..."
-5. System picker opens (multi-select enabled)
-6. Selects files → Taps Open
-7. Files validate (.m4v only)
-8. Async import per file:
-   - Copy to app container
-   - Extract metadata
-   - Generate poster
-   - Save to SwiftData
-9. Items appear in grid as completed
+1. ImportView (bottom 25% of Inspector)
+   └── "Import" button (misnamed - actually bookmarks)
+       └── Document Picker opens
+           └── Select external folder
+               ├── Security-scoped URL obtained
+               ├── Bookmark created and saved
+               └── Folder appears in FileBrowser
 ```
 
-### Delete Flow
-```
-1. User in MoviesView/ShowsView
-2. Long press on poster (iOS/macOS)
-3. Context menu appears
-4. Taps "Delete" (destructive role)
-5. File removed from disk
-6. Record deleted from SwiftData
-7. Poster orphaned (known issue)
-8. Grid updates immediately
-```
+## Component Navigation Details
 
-## Navigation Components
+### InspectorPanel
+**Width**: 320pt (macOS) / 280pt (iOS)  
+**Split**: 75% OutlinerView / 25% ImportView  
+**Style**: Glass material with floating panel appearance
 
-### Sidebar (VideoPlayerNavigationSidebar)
-```yaml
-structure:
-  header: "Library"
-  items:
-    - label: "Movies"
-      icon: "film"
-      badge: movieItems.count || nil
-    - label: "Shows"
-      icon: "tv"
-      badge: showItems.count || nil
-  footer: Import controls (iOS/macOS)
-
-state:
-  @State selection: NavigationItem?
-  @State searchText: String (unused)
-  @State showingFileImporter: Bool
-  @State importKind: VideoKind
-
-behavior:
-  selection_change: Updates detail view
-  badge_update: Auto via @Query
-  import_trigger: Opens fileImporter sheet
+```swift
+struct InspectorPanel: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            // Top 75%: File browser
+            OutlinerView()
+                .frame(height: geometry.size.height * 0.75)
+            
+            // Bottom 25%: Import/bookmark controls
+            ImportView(onImport: { url in
+                // Create bookmark for external folder
+            })
+                .frame(height: geometry.size.height * 0.25)
+        }
+    }
+}
 ```
 
-### MoviesView
-```yaml
-navigation_type: Push
-grid_structure:
-  type: LazyVGrid
-  columns: adaptive(140-220pt)
-item_interaction:
-  tap: NavigationLink → MovieView
-  long_press: Context menu (delete)
-  focus: Scale effect (tvOS)
-empty_state:
-  icon: "film"
-  title: "No Movies"
-  message: "Import .m4v files to see your movies here"
+### FileBrowser Navigation
+
+**Navigation Destinations**:
+```swift
+enum Destination {
+    case movies    // → MoviesView
+    case shows     // → ShowsView  
+    case file(URL) // → Direct playback
+}
 ```
 
-### MovieView (Playback Screen)
-```yaml
-entry: NavigationLink from grid
-controls:
-  back:
-    position: top-left
-    action: dismiss()
-  play:
-    position: bottom-center
-    action: Start playback, fade UI
-  fullscreen:
-    position: top-right
-    action: Platform-specific expand
-exit:
-  back_button: Return to grid
-  gesture: None (must use button)
+**Folder Recognition**:
+```swift
+if item.isDirectory {
+    let lowerName = item.displayName.lowercased()
+    if lowerName == "movies" {
+        onNavigate?(.movies)  // → MoviesView in Detail
+    } else if lowerName == "tv shows" {
+        onNavigate?(.shows)   // → ShowsView in Detail
+    } else {
+        // Expand folder in place
+        isExpanded.toggle()
+    }
+} else {
+    // File selected - play directly
+    currentMedia = item.url
+    onNavigate?(.file(item.url))
+}
 ```
+
+### Detail View Routing
+
+```swift
+@ViewBuilder
+private var detailView: some View {
+    if let selection {
+        switch selection.label {
+        case "Movies":
+            MoviesView()  // Grid of movie posters
+        case "Shows":
+            ShowsView()   // Grid of show cards
+        default:
+            Text("Select an item")
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+```
+
+## Navigation State Management
+
+### Current Implementation (Hybrid)
+```swift
+// Legacy: NavigationItem selection
+@State private var selection: NavigationItem? = 
+    NavigationItem(label: "Movies", systemImage: "film")
+
+// New: Direct URL navigation
+@State private var currentMedia: URL? = nil
+
+// File browser state
+@StateObject private var fileManager = MediaFileManager()
+@Published var rootItems: [MediaFileItem] = []
+@Published var expandedFolders: Set<URL> = []
+```
+
+### State Synchronization Issues
+- FileBrowser and Detail View not fully synchronized
+- Legacy NavigationItem still used for main routing
+- Direct file selection bypasses navigation state
+
+## User Interface Elements
+
+### Inspector Components
+
+**OutlinerView** (75% of Inspector):
+- Contains FileBrowser
+- Shows folder hierarchy
+- Expandable folders
+- File selection
+
+**ImportView** (25% of Inspector):
+- Bookmark management (misnamed)
+- Should be "Add Folder" or "Bookmarks"
+- Creates security-scoped bookmarks on iOS
+
+### Detail View Components
+
+**MoviesView**:
+- LazyVGrid of 2:3 posters
+- Still uses SwiftData @Query
+- Context menu for delete
+- NavigationLink to MovieView
+
+**ShowsView**:
+- Variable-size grid cards
+- Still uses SwiftData @Query
+- Expandable show cards
+- Future: Season navigation
+
+**MovieView**:
+- AVPlayer for playback
+- Fade overlay controls
+- Back/Play/Fullscreen buttons
+- Platform-specific volume controls
+
+## Navigation Transitions
+
+| From | To | Trigger | Type | Implementation |
+|------|-----|---------|------|----------------|
+| FileBrowser | MoviesView | Tap "Movies" folder | Detail update | onNavigate(.movies) |
+| FileBrowser | ShowsView | Tap "TV Shows" folder | Detail update | onNavigate(.shows) |
+| FileBrowser | Playback | Tap .m4v file | Modal/Sheet | AVPlayer(url:) |
+| MoviesView | MovieView | Tap poster | Navigation push | NavigationLink |
+| ImportView | Document Picker | Tap Import | Modal sheet | .fileImporter |
+| Any | Fullscreen | Fullscreen button | Platform modal | .fullScreenCover |
 
 ## Platform Navigation Patterns
 
-### iOS Navigation
+### iOS
 ```swift
-// Split view with sidebar
-NavigationSplitView {
-    Sidebar
-        .navigationSplitViewColumnWidth(min: 200, ideal: 240, max: 300)
-} detail: {
-    DetailView
+// Sheet presentations
+.sheet(isPresented: $showingPicker) {
+    AdvancedDocumentPicker(...)
 }
 
 // Fullscreen video
@@ -204,168 +254,177 @@ NavigationSplitView {
     VideoPlayer(player: player)
 }
 
-// File import
-.fileImporter(
-    isPresented: $showingFileImporter,
-    allowedContentTypes: [.mpeg4Movie],
-    allowsMultipleSelection: true
-)
+// Context menus
+.contextMenu {
+    Button("Delete", role: .destructive) { ... }
+}
 ```
 
-### tvOS Navigation
+### tvOS
 ```swift
-// Single stack (no split)
-NavigationStack {
-    VStack {
-        Sidebar.frame(maxHeight: 360)
-        Divider()
-        DetailView
-    }
-}
+// Focus-based navigation
+@FocusState private var focusedItem: MediaFileItem?
 
-// Focus-based selection
-@FocusState private var isFocused: Bool
-.focusable(true)
-.focused($isFocused)
+// No sheets - everything inline
+// No context menus - use buttons
+// Remote control navigation
 
-// No file import available
-// No context menus
-// Button-based controls only
+Button("Play") { ... }
+    .focused($isPlayButtonFocused)
 ```
 
-### macOS Navigation
+### macOS
 ```swift
-// Split view with sidebar
-NavigationSplitView {
-    Sidebar // With traffic light spacing
-} detail: {
-    DetailView
-}
-
-// Window fullscreen
+// Native window fullscreen
 NSApp.windows.first?.toggleFullScreen(nil)
 
-// Native context menus
+// Right-click context menus
 .contextMenu { ... }
 
-// Hover states enabled
-```
+// Hover states
+.onHover { isHovered in ... }
 
-## Navigation State Management
-
-### Selection State
-```swift
-// Shared between sidebar and detail
-@State private var selection: NavigationItem? = 
-    NavigationItem(label: "Movies", systemImage: "film")
-
-// NavigationItem is Hashable for selection
-```
-
-### Query-Driven Updates
-```swift
-// Badges update automatically
-@Query(filter: #Predicate<VPVideo> { $0.kindRaw == "movie" })
-private var movieItems: [VPVideo]
-
-// Used in navigation items
-badge: movieItems.isEmpty ? nil : movieItems.count
-```
-
-### Import State
-```swift
-@State private var showingFileImporter = false
-@State private var importKind: VideoKind = .movie
-@Environment(\.modelContext) private var modelContext
+// Keyboard shortcuts (future)
+.keyboardShortcut(.space, modifiers: [])
 ```
 
 ## Empty States
 
-### No Movies
-- **Icon**: SF Symbol "film"
-- **Title**: "No Movies"
-- **Message**: "Import .m4v files to see your movies here"
-- **Action**: None (passive)
-
-### No Shows
-- **Icon**: SF Symbol "tv"
-- **Title**: "No Shows"  
-- **Message**: "Import .m4v files to see your shows here"
-- **Action**: None (passive)
+### No Videos in Folder
+```swift
+ContentUnavailableView(
+    "No Movies",
+    systemImage: "film",
+    description: Text("Add .m4v files to this folder")
+)
+```
 
 ### Nothing Selected
-- **Icon**: None
-- **Title**: "Select an item"
-- **Message**: None
-- **Style**: .secondary foreground
-
-## Navigation Transitions
-
-| From | To | Trigger | Animation | Type |
-|------|-----|---------|-----------|------|
-| Sidebar | MoviesView | Select "Movies" | None | Replace detail |
-| Sidebar | ShowsView | Select "Shows" | None | Replace detail |
-| MoviesView | MovieView | Tap poster | Default push | NavigationLink |
-| ShowsView | (Future) | Tap show card | Default push | NavigationLink |
-| MovieView | Fullscreen | Tap button | Sheet/Window | Modal |
-| Any | File Picker | Import button | Sheet slide | Modal |
-| Grid | Context Menu | Long press | Popup | Popover |
-| MovieView | Grid | Back button | Default pop | Navigation pop |
-
-## Focus Navigation (tvOS)
-
-### Focus Flow
-```
-Sidebar Items → Grid Items → Playback Controls
-     ↑              ↓              ↓
-     └──────────────←──────────────┘
+```swift
+Text("Select an item")
+    .foregroundStyle(.secondary)
 ```
 
-### Focus Guides
-- Sidebar: Vertical navigation
-- Grid: 2D navigation with guide rails
-- Playback: Horizontal button focus
+## Navigation Issues & Improvements
 
-### Remote Buttons
-- **Menu**: Back/dismiss
-- **Play/Pause**: Toggle playback
-- **Select**: Activate focused item
-- **Directional**: Move focus
+### Current Issues ⚠️
 
-## Keyboard Navigation (macOS)
+1. **Dual Navigation Systems**
+   - FileBrowser uses URLs
+   - Detail views use SwiftData queries
+   - Not synchronized
 
-### Shortcuts (Future)
-- **Space**: Play/Pause
-- **←/→**: Seek -10/+10 seconds
-- **↑/↓**: Volume up/down
-- **F**: Toggle fullscreen
-- **Esc**: Exit fullscreen
-- **⌘O**: Import files
-- **Delete**: Delete selected
+2. **Confusing Terminology**
+   - "Import" doesn't import
+   - Creates bookmarks instead
+   - Users expect file copying
 
-## Navigation Performance
+3. **State Management**
+   - NavigationItem for main routing
+   - URL for file selection
+   - SwiftData for queries
 
-### Optimized
-- Lazy loading grids
+### Proposed Improvements ✅
+
+1. **Unified Navigation**
+```swift
+enum NavigationDestination {
+    case folder(URL)
+    case videoList(VideoKind)
+    case videoPlayback(URL)
+}
+
+@State private var navigationPath: [NavigationDestination] = []
+```
+
+2. **Rename ImportView**
+```swift
+// Old: ImportView
+// New: BookmarkManager or FolderAccess
+struct BookmarkManager: View {
+    // Clear naming for bookmark functionality
+}
+```
+
+3. **Remove SwiftData Dependency**
+```swift
+// Instead of @Query
+let movies = fileManager.videos(in: .movies)
+let shows = fileManager.videos(in: .shows)
+```
+
+## Keyboard Navigation (Future)
+
+### Planned Shortcuts
+| Key | Action | Platform |
+|-----|--------|----------|
+| Space | Play/Pause | All |
+| ← → | Skip ±10s | All |
+| ↑ ↓ | Volume | macOS/iOS |
+| F | Fullscreen | macOS |
+| ⌘O | Add Folder | macOS |
+| Delete | Delete Item | macOS |
+
+## Accessibility
+
+### Current
+- Basic VoiceOver labels
+- Focus indicators on tvOS
+- Standard navigation announcements
+
+### Needed
+- Custom actions for complex controls
+- Better descriptions for folder hierarchy
+- Keyboard navigation on macOS
+- Focus management in Inspector
+
+## Performance Considerations
+
+### Optimized ✅
+- Lazy loading in grids
 - Single detail view instance
 - Shallow navigation stack
-- No unnecessary re-renders
 
-### Needs Work
-- No deep linking
+### Needs Work ⚠️
+- Directory enumeration blocks UI
 - No state restoration
-- No navigation history
-- No breadcrumbs
+- No deep linking support
+- SwiftData queries unnecessary
 
-## Future Navigation Enhancements
+## Testing Navigation
 
-1. **ShowView**: Individual show playback screen
-2. **Search Results**: Filtered grid view
-3. **Settings**: Preferences screen
-4. **Queue**: Multi-video playlist
-5. **History**: Recently watched
-6. **Filters**: Genre/year/duration
-7. **Sort Options**: Name/date/duration
-8. **Deep Linking**: URL scheme support
-9. **State Restoration**: Resume where left off
-10. **Keyboard Navigation**: Full keyboard control
+### Critical Paths to Test
+1. Launch → Browse → Play
+2. Add external folder (iOS)
+3. Navigate Movies vs Shows
+4. Delete from context menu
+5. Fullscreen transitions
+6. Platform-specific controls
+
+### Edge Cases
+- Empty folders
+- Stale bookmarks (iOS)
+- Disconnected drives (macOS)
+- Large directories (1000+ files)
+- Mixed content folders
+
+## Navigation Roadmap
+
+### Phase 1: Cleanup (Current)
+- [x] Inspector panel implementation
+- [x] FileBrowser navigation
+- [ ] Rename ImportView
+- [ ] Remove dual state
+
+### Phase 2: Unification
+- [ ] Single navigation model
+- [ ] Remove SwiftData queries
+- [ ] Filesystem-only state
+- [ ] Consistent terminology
+
+### Phase 3: Enhancement
+- [ ] Keyboard navigation
+- [ ] State restoration
+- [ ] Deep linking
+- [ ] Search/filter
+- [ ] Breadcrumb trail

@@ -1,271 +1,446 @@
 # VideoPlayer Implementation Status
 
-**Purpose**: Current state of the VideoPlayer codebase and what actually works  
-**Version**: 1.0  
-**Status**: Feature Complete  
-**Last Updated**: August 12, 2025
+**Purpose**: Current state of the VideoPlayer v2.0 filesystem-based implementation  
+**Version**: 2.0  
+**Status**: Hybrid Implementation (Filesystem + Legacy SwiftData)  
+**Last Updated**: September 2025
+
+## Implementation Overview
+
+The project is in a hybrid state, with new filesystem browsing alongside legacy import/SwiftData components. The app works but contains redundant systems that need cleanup.
 
 ## Quick Status Dashboard
 
-| Component | Status | Coverage | Tests | Performance | Notes |
-|-----------|--------|----------|-------|-------------|-------|
-| **VPVideo Model** | ✅ | 100% | None | Good | SwiftData with kindRaw |
-| **Import Pipeline** | ✅ | 100% | None | Good | Coordinated file copy |
-| **Movies Grid** | ✅ | 100% | None | Good | 2:3 posters, LazyVGrid |
-| **Shows Grid** | ✅ | 100% | None | Good | Variable size cards |
-| **Video Playback** | ✅ | 100% | None | Good | AVPlayer with overlay |
-| **Poster Generation** | ✅ | 90% | None | Fair | 10% into video frame |
-| **Volume Control** | ✅ | 100% | None | Good | Platform-specific |
-| **Fullscreen** | ✅ | 100% | None | Good | macOS window, iOS sheet |
-| **File Deletion** | ✅ | 100% | None | Good | File + record removal |
-| **Sidebar Navigation** | ✅ | 100% | None | Good | Badge counts work |
+| Component | Status | Working | Tests | Notes |
+|-----------|--------|---------|-------|-------|
+| **FileBrowser** | ✅ | 100% | None | Media-focused browser |
+| **FileSystem** | ✅ | 100% | None | General file operations |
+| **FileSystemModel** | ✅ | 100% | None | Platform abstractions |
+| **InspectorPanel** | ✅ | 100% | None | Replaces Sidebar |
+| **OutlinerView** | ✅ | 100% | None | Contains FileBrowser |
+| **ImportView** | ⚠️ | 100% | None | Repurposed for bookmarks |
+| **Security Scoping** | ✅ | 100% | None | iOS bookmarks working |
+| **Direct Playback** | ✅ | 100% | None | No copying needed |
+| **SwiftData Models** | ⚠️ | 100% | None | Legacy, still active |
+| **VideoImportService** | ⚠️ | 50% | None | Partially deprecated |
+| **Poster System** | ✅ | 90% | None | Still blocks UI |
+| **Movies/Shows Split** | ✅ | 100% | None | Folder-based |
 
 ### Legend
-- ✅ Complete and tested
-- 🔄 In progress
-- 📝 Placeholder/UI only
-- ❌ Broken/Blocked
+- ✅ Complete and working
+- ⚠️ Working but needs refactoring
+- 🔄 In transition
+- ❌ Broken/Deprecated
 
-## File Structure Matrix
+## Component Implementation Details
 
-| Directory/File | Purpose | Lines | Status | Notes |
-|----------------|---------|-------|--------|-------|
-| **VideoPlayer/** | Project root | - | ✅ | Clean structure |
-| **├── App/** | Entry & resources | - | ✅ | |
-| **│   ├── VideoPlayerApp.swift** | Main entry | 23 | ✅ | ModelContainer setup |
-| **│   ├── Item.swift** | Template model | 18 | 📝 | Unused, from template |
-| **│   └── Assets.xcassets** | Images/colors | - | ✅ | Minimal assets |
-| **├── Models/** | Data layer | - | ✅ | |
-| **│   └── VideoModels.swift** | VPVideo model | 48 | ✅ | kindRaw workaround |
-| **├── Services/** | Business logic | - | ✅ | |
-| **│   ├── VideoImportService.swift** | Import/delete | 177 | ✅ | Coordinated access |
-| **│   └── VideoPlayerService.swift** | Playback | 84 | ✅ | Singleton pattern |
-| **├── Views/** | UI components | - | ✅ | |
-| **│   ├── ContentView.swift** | Main container | 93 | ✅ | Platform routing |
-| **│   ├── Sidebar.swift** | Navigation | 400 | ✅ | Complex but working |
-| **│   ├── MoviesView.swift** | Movie grid | 189 | ✅ | 2:3 posters |
-| **│   ├── ShowsView.swift** | Shows grid | 328 | ✅ | Variable sizes |
-| **│   ├── MovieView.swift** | Playback screen | 240 | ✅ | Fade overlay |
-| **│   ├── MoviePoster.swift** | Poster component | 251 | ✅ | JPEG persistence |
-| **│   ├── VideoPlaybackBar.swift** | Controls | 517 | ✅ | WWDC25 style |
-| **│   └── VideoPlayerView.swift** | Simple player | 31 | ✅ | Wrapper view |
+### Core/ Directory (New Filesystem Layer)
 
-**Total**: 13 Swift files, 2,399 lines of code
-
-## Working Features
-
-### ✅ M4V Import Pipeline
+#### FileBrowser.swift
+**Purpose**: Simplified media browser for Documents/VideoPlayer  
+**Status**: ✅ Complete  
+**Lines**: ~430
 ```swift
-// Complete implementation in VideoImportService
-1. Validate .m4v extension + mpeg4Movie UTType
-2. Security-scoped resource access
-3. Coordinated file copy to app container  
-4. Extract metadata via AVAsset (sync)
-5. Create VPVideo with proper VideoKind
-6. Generate poster at 10% timestamp
-7. Save to SwiftData
+struct FileBrowser: View {
+    @StateObject private var fileManager = MediaFileManager()
+    @Binding var currentMedia: URL?
+    
+    enum Destination {
+        case movies, shows, file(URL)
+    }
+    
+    var onNavigate: ((Destination) -> Void)? = nil
+}
+
+class MediaFileManager: ObservableObject {
+    @Published var rootItems: [MediaFileItem] = []
+    private let videoExtensions = ["mp4", "mov", "mkv", "avi", "m4v"]
+    
+    func setupMediaStructure() {
+        let defaultFolders = ["Movies", "TV Shows"]
+        // Auto-creates folder structure
+    }
+}
 ```
 
-### ✅ Library Navigation
-```swift
-// Sidebar with dynamic counts
-@Query(filter: #Predicate<VPVideo> { $0.kindRaw == "movie" })
-private var movieItems: [VPVideo]  // Badge: movieItems.count
+**Key Features**:
+- Auto-creates Movies/ and TV Shows/ folders
+- Filters to video files only
+- Recognizes folder types for navigation
+- Delete functionality working
+- No import - direct browse
 
-// Import controls pinned to bottom
-Menu with kind selection → fileImporter → async import
+#### FileSystem.swift
+**Purpose**: Full filesystem browser with CRUD operations  
+**Status**: ✅ Complete  
+**Lines**: ~525
+```swift
+struct FileSystemView: View {
+    @StateObject private var viewModel = FileSystemViewModel()
+    @State private var showHiddenFiles = false
+    @State private var sortOrder = SortOrder.nameAscending
+    
+    // Full context menu operations
+    // Create folder/file sheets
+    // Sort and filter options
+}
 ```
 
-### ✅ Video Playback
+**Working Features**:
+- Create folders/files
+- Delete items
+- Rename items
+- Copy path
+- Show/hide hidden files
+- Multiple sort orders
+- Platform-specific actions (Reveal in Finder on macOS)
+
+#### FileSystemModel.swift
+**Purpose**: Platform abstraction layer  
+**Status**: ✅ Complete  
+**Lines**: ~540
 ```swift
-// MovieView implementation
-AVPlayer(url: resolvedURL)
-Fade overlay: opacity(isPlaying ? 0 : 1)
-Animation: .easeInOut(duration: 0.25)
-Controls: Back, Play, Fullscreen
+@MainActor
+class FileSystemViewModel: ObservableObject {
+    @Published var rootItems: [FileSystemItem] = []
+    @Published var expandedFolders: Set<URL> = []
+    @Published var selectedItem: FileSystemItem?
+    
+    // Platform-specific root locations
+    // iOS: Documents, VideoPlayer, iCloud
+    // tvOS: Documents only (sandbox)
+    // macOS: Home, Desktop, Documents, Downloads, Applications
+}
 ```
 
-### ✅ Poster System
+**Platform Implementations**:
+- ✅ iOS: Security-scoped bookmarks working
+- ✅ tvOS: Sandbox-only access working
+- ✅ macOS: Full filesystem access working
+
+### Inspector/ Directory (Navigation System)
+
+#### InspectorPanel.swift
+**Purpose**: Container replacing old Sidebar  
+**Status**: ✅ Complete  
+**Lines**: ~150
 ```swift
-// MoviePosterStore implementation
-Location: Application Support/[BundleID]/Posters/
-Format: JPEG at 0.85 quality
-Size: 1200x1800 max (2:3 ratio)
-Fallback: Gradient with film icon
+struct InspectorPanel: View {
+    private var inspectorWidth: CGFloat {
+        #if os(macOS)
+        return 320
+        #else
+        return 280
+        #endif
+    }
+    
+    // 75% OutlinerView
+    // 25% ImportView
+    // Glass design with floating panel style
+}
 ```
 
-## Platform-Specific Implementation
-
-### iOS (17.0+)
+#### OutlinerView.swift
+**Purpose**: Contains FileBrowser  
+**Status**: ✅ Complete  
+**Lines**: ~90
 ```swift
-- NavigationSplitView with sidebar
-- fileImporter(allowedContentTypes: [.mpeg4Movie])
-- .fullScreenCover for video
-- DragGesture for volume
-- Context menus for delete
-- Sheet presentations
+struct OutlinerView: View {
+    @State private var currentMedia: URL? = nil
+    
+    var body: some View {
+        ScrollView {
+            FileBrowser(currentMedia: $currentMedia)
+                .padding(16)
+        }
+    }
+}
 ```
 
-### tvOS (17.0+)
+#### ImportView.swift
+**Purpose**: Bookmark management (NOT file import)  
+**Status**: ⚠️ Confusing name  
+**Lines**: ~60
 ```swift
-- NavigationStack (no split)
-- No file import (no storage)
-- @FocusState for navigation
-- Button-based volume (no drag)
-- Larger UI (1.5x scaling)
-- No context menus
+struct ImportView: View {
+    // Now manages folder bookmarks
+    // Should be renamed to BookmarkView
+}
 ```
 
-### macOS (14.0+)
+### Sources/Shared/ Directory (Utilities)
+
+#### FilePermissionsHelper.swift
+**Purpose**: iOS security-scoped resources  
+**Status**: ✅ Complete  
+**Lines**: ~290
 ```swift
-- NavigationSplitView
-- window.toggleFullScreen(nil)
-- Traffic light spacing (28pt)
-- Hover states on posters
-- Full keyboard/mouse
-- Native window chrome
+// Document picker coordination
+// Bookmark creation and restoration
+// Security-scoped resource management
 ```
+
+**Working Features**:
+- Document picker for folders
+- Bookmark persistence in UserDefaults
+- Security-scoped resource access
+- Stale bookmark detection
+
+#### GlassButtonStyle.swift
+**Status**: ✅ Complete  
+**Lines**: ~25
+```swift
+// WWDC 2025 glass design
+// Ultra-thin material with border
+```
+
+#### PlatformColor.swift
+**Status**: ✅ Complete  
+**Lines**: ~30
+```swift
+// Cross-platform color abstraction
+// NSColor/UIColor compatibility
+```
+
+#### HapticFeedback.swift
+**Status**: ✅ Complete  
+**Lines**: ~20
+```swift
+// iOS haptic feedback
+// No-op on macOS/tvOS
+```
+
+### Legacy Components (Still Active)
+
+#### VideoImportService.swift
+**Status**: ⚠️ Partially deprecated  
+**Current Use**: Metadata extraction only
+```swift
+// Still used for:
+- absoluteURL(for video:) - Getting SwiftData video paths
+- Poster generation logic
+
+// No longer used for:
+- File copying
+- Import pipeline
+```
+
+#### VPVideo Model (SwiftData)
+**Status**: ⚠️ Legacy but active
+```swift
+@Model
+public final class VPVideo {
+    public var kindRaw: String  // Still using workaround
+    public var kind: VideoKind {
+        get { VideoKind(rawValue: kindRaw) ?? .movie }
+        set { kindRaw = newValue.rawValue }
+    }
+}
+```
+
+**Still Used By**:
+- MoviesView: `@Query(filter: #Predicate<VPVideo> { $0.kindRaw == "movie" })`
+- ShowsView: `@Query(filter: #Predicate<VPVideo> { $0.kindRaw == "show" })`
+- MoviePoster: For poster URL generation
+
+## Current App Flow
+
+### Navigation Flow
+```
+1. App Launch
+   └── ContentView
+       ├── tvOS: NavigationStack with VideoPlayerNavigationSidebar
+       └── iOS/macOS: NavigationSplitView
+           ├── Sidebar: InspectorPanel
+           │   ├── OutlinerView (75%)
+           │   │   └── FileBrowser
+           │   └── ImportView (25%)
+           └── Detail: MoviesView or ShowsView
+```
+
+### File Access Flow (iOS)
+```
+1. FileBrowser displays Documents/VideoPlayer
+2. User taps "Import" (actually bookmark)
+3. Document picker opens
+4. User selects folder
+5. Create security-scoped bookmark
+6. Store in UserDefaults
+7. Folder contents accessible
+```
+
+### Playback Flow
+```
+1. Browse to .m4v file in FileBrowser
+2. Tap file
+3. URL passed to AVPlayer
+4. Direct playback (no copy)
+5. No SwiftData record created
+```
+
+## File Count Summary
+
+| Directory | Files | Lines | Status |
+|-----------|-------|-------|--------|
+| **Core/** | 3 | ~1,495 | ✅ New, Complete |
+| **Inspector/** | 3 | ~300 | ✅ New, Complete |
+| **Sources/Shared/** | 4 | ~365 | ✅ New, Complete |
+| **Models/** | 2 | ~50 | ⚠️ Legacy, Active |
+| **Services/** | 2 | ~260 | ⚠️ Partial Use |
+| **Views/** | 6 | ~2,000 | ✅ Updated |
+| **App/** | 3 | ~140 | ✅ Updated |
+| **Total** | 23 | ~4,610 | Hybrid State |
 
 ## Known Issues
 
 ### 🐛 Active Bugs
+- Poster generation blocks UI thread
+- Poster orphaning on delete (legacy system)
+- ImportView naming confusion
+- Mixed paradigms (browse + import)
+
+### ⚠️ Technical Debt
 ```yaml
-bugs:
-  - none_currently_reported
+HIGH:
+  - SwiftData still active but unnecessary
+  - VideoImportService partially used
+  - Two video listing systems (filesystem + SwiftData)
+  
+MEDIUM:
+  - No file watching for updates
+  - No background poster generation
+  - Confusing ImportView name
+  
+LOW:
+  - Item.swift template file still present
+  - No loading indicators
+  - No keyboard shortcuts
 ```
 
-### ⚠️ Limitations
-```yaml
-limitations:
-  - m4v_only: "No MP4, MOV, MKV support"
-  - no_playlists: "Single video playback only"
-  - no_chapters: "No chapter navigation"
-  - no_subtitles: "No subtitle track selection"
-  - no_preview: "No scrubbing preview"
-  - no_pip: "No picture-in-picture"
+## Platform-Specific Implementation Status
+
+### iOS ✅
+- Security-scoped resources: Working
+- Document picker: Working
+- Bookmark persistence: Working
+- Files app visibility: Working
+- Sheet presentations: Working
+
+### tvOS ✅
+- Sandbox-only access: Working
+- Auto-folder creation: Working
+- Focus navigation: Working
+- No import capability: Correct
+- Button-based controls: Working
+
+### macOS ✅
+- Full filesystem access: Working
+- Reveal in Finder: Working
+- Open in Terminal: Working
+- Window management: Working
+- Hover states: Working
+
+## Performance Metrics
+
+### Good Performance ✅
+- Direct file playback (no copying)
+- Lazy grid scrolling
+- Minimal memory usage
+- Fast navigation
+
+### Performance Issues ⚠️
+- Poster generation blocks UI (200-500ms)
+- Large directory enumeration synchronous
+- No caching of directory contents
+- SwiftData queries unnecessary overhead
+
+## Migration Status
+
+### Completed ✅
+1. Added filesystem browsing
+2. Inspector panel navigation
+3. Security-scoped resources
+4. Direct playback
+5. Platform abstractions
+
+### In Progress 🔄
+1. Dual system maintenance
+2. Legacy component removal planning
+
+### Not Started ❌
+1. Remove VideoImportService
+2. Remove SwiftData models
+3. Remove import UI remnants
+4. Unified poster system
+
+## Next Implementation Priorities
+
+### Immediate (Clean up hybrid state)
+1. Remove or rename ImportView to BookmarkView
+2. Decide on SwiftData removal timeline
+3. Unify poster system with filesystem
+4. Add async directory enumeration
+
+### Short Term (Polish)
+1. Background poster generation
+2. File watching for updates
+3. Loading indicators
+4. Keyboard shortcuts
+5. Search functionality
+
+### Long Term (Enhancement)
+1. Complete SwiftData removal
+2. Thumbnail caching system
+3. Preview on hover
+4. Metadata extraction
+5. Watch status tracking
+
+## Testing Coverage
+
+### Current: 0%
+No tests exist for any components.
+
+### Priority Test Areas
+1. Security-scoped resource handling
+2. Bookmark persistence/restoration
+3. Platform-specific code paths
+4. File operations (create/delete)
+5. Navigation state
+
+## Build Configuration
+
+### Info.plist Keys ✅
+```xml
+<key>UIFileSharingEnabled</key><true/>
+<key>LSSupportsOpeningDocumentsInPlace</key><true/>
+<key>UISupportsDocumentBrowser</key><true/>
 ```
 
-### 🔧 Technical Debt
-```yaml
-technical_debt:
-  HIGH:
-    - "Poster generation blocks UI thread"
-    - "No background audio continuation"
-    - "Posters orphaned on delete"
-  MEDIUM:
-    - "No poster regeneration option"
-    - "Volume not persisted"
-    - "No keyboard shortcuts"
-  LOW:
-    - "Item.swift unused template file"
-    - "No haptic feedback"
-    - "No loading indicators"
+### Entitlements ✅
+```xml
+<key>com.apple.security.app-sandbox</key><true/>
+<key>com.apple.security.files.user-selected.read-only</key><true/>
 ```
 
-## Code Metrics
+## Health Score: 75/100
 
-### Complexity
-- **Cyclomatic Complexity**: Low (most methods < 5)
-- **Nesting Depth**: Max 3 levels
-- **File Length**: VideoPlaybackBar.swift too long (517 lines)
+### Strengths ✅
+- Filesystem browsing working perfectly
+- Platform abstractions solid
+- Direct playback eliminates storage issues
+- Security model properly implemented
 
-### Dependencies
-- **External**: 0 (all system frameworks)
-- **Internal**: Minimal coupling between components
-- **Singletons**: 2 (Import & Player services)
-
-### Platform Code
-- **#if blocks**: 58 occurrences
-- **iOS-specific**: ~40%
-- **tvOS-specific**: ~30%
-- **macOS-specific**: ~30%
-
-## Performance Profile
-
-### Good Performance
-- Grid scrolling smooth (LazyVGrid)
-- Video playback instant
-- Import reasonably fast
-- Memory usage stable
-
-### Performance Issues
-- Poster generation: 200-500ms UI block
-- Large imports: No progress indication
-- First launch: SwiftData setup delay
-
-## API Surface
-
-### Public APIs
-```swift
-// VideoImportService
-func importFile(at: URL, kind: VideoKind, modelContext: ModelContext) async throws -> VPVideo
-func delete(video: VPVideo, modelContext: ModelContext) throws
-static func absoluteURL(for: VPVideo) throws -> URL
-
-// VideoPlayerService  
-func load(url: URL, title: String?)
-func togglePlayback()
-func seek(by: Double)
-var isPlaying: Bool { get }
-var volume: Float { get set }
-```
-
-### Internal APIs
-All view components are internal to the module.
-
-## Next Implementation Priority
-
-### Immediate (This Week)
-1. Fix poster orphaning on delete
-2. Add loading indicators during import
-3. Move poster generation to background queue
-
-### Short Term (This Month)
-1. Add keyboard shortcuts (space=play/pause)
-2. Implement scrubbing preview
-3. Add volume persistence
-4. Background audio continuation
-
-### Long Term (This Quarter)
-1. Picture-in-picture support
-2. Chapter markers
-3. Subtitle support
-4. AirPlay integration
-5. Playlist/queue system
-
-## Testing Status
-
-### Current Coverage: 0%
-No tests written yet. Priority areas for testing:
-1. Import validation logic
-2. File coordination
-3. Metadata extraction
-4. Model persistence
-5. Platform-specific code
-
-## Build & Deploy
-
-### Requirements
-- Xcode 15.0+
-- iOS 17.0+ / tvOS 17.0+ / macOS 14.0+
-- Swift 5.9+
-
-### Build Settings
-- Optimization: -O for Release
-- Strip Swift Symbols: YES
-- Bitcode: NO
-
-### Known Build Issues
-- None currently
-
-## Module Health: 95/100
-
-**Strengths:**
-- Clean architecture from AudioPlayer
-- Platform-specific adaptations working
-- Core functionality complete
-
-**Weaknesses:**
+### Weaknesses ⚠️
+- Hybrid state confusing
+- Legacy components still active
 - No tests
-- Some UI blocking operations
-- Technical debt accumulating
+- Performance issues remain
+- Documentation doesn't match implementation
+
+## Recommendations
+
+1. **Commit to filesystem-only approach** - Remove SwiftData entirely
+2. **Rename/refactor ImportView** - It's not importing anymore
+3. **Add tests** - Especially for security-scoped resources
+4. **Async operations** - Directory enumeration, poster generation
+5. **Update user-facing text** - Remove "import" language

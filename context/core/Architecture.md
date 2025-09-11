@@ -1,229 +1,298 @@
 # VideoPlayer Architecture Context
 
-**Purpose**: Technical blueprint for M4V-only video player forked from AudioPlayer  
-**Version**: 1.0  
-**Status**: Production Ready  
-**Last Updated**: August 12, 2025
+**Purpose**: Technical blueprint for filesystem-first M4V video player  
+**Version**: 2.0  
+**Status**: Major Refactor Complete  
+**Last Updated**: September 2025
 
-## Key Concepts (AI Quick Reference)
+## Architectural Evolution
 
-### Core Architecture Pattern
+### Version 1.0 → 2.0 Transformation
 ```
-M4V Files + AVPlayer + SwiftData = QuickTime-style Player
-AudioPlayer Fork → Video Transformation → DVD Library Experience
-```
-
-### Critical Design Elements
-1. **M4V Exclusivity** - Single format discipline (like AudioPlayer's M4A-only)
-2. **2:3 Poster Ratio** - DVD box art aesthetic (replaces square album art)
-3. **Movies/Shows Split** - VideoKind enum with kindRaw workaround
-4. **Platform Adaptations** - tvOS no-drag, macOS fullscreen, iOS sheets
-
-## System Architecture
-
-### Core Design Pattern
-**Forked Audio → Video Architecture**
-- AVAudioPlayer replaced with AVPlayer for video playback
-- Album/Song models transformed to VPVideo with VideoKind
-- Square album artwork becomes 2:3 movie posters
-- Music library metaphor adapted to video library (Movies/Shows)
-
-### Component Architecture
-```
-┌─────────────────────────────────────────┐
-│          VideoPlayerApp                  │
-│         (SwiftData Container)            │
-└─────────────┬───────────────────────────┘
-              │
-    ┌─────────┴──────────┬──────────────┐
-    ▼                    ▼              ▼
-┌─────────┐      ┌──────────┐    ┌──────────┐
-│ Models  │      │ Services │    │  Views   │
-├─────────┤      ├──────────┤    ├──────────┤
-│ VPVideo │◄────►│Import    │    │ContentView│
-│VideoKind│      │Player    │◄───│MovieView │
-└─────────┘      └──────────┘    │MoviesView│
-                                  └──────────┘
+v1.0: Import → Copy to Library → SwiftData → Play
+v2.0: Browse Filesystem → Play In-Place → Direct Access
 ```
 
-## Technical Architecture
+The project has evolved from an import-based library system to a direct filesystem browser, eliminating file duplication while maintaining the M4V-only discipline and Movies/Shows organization.
 
-### State Management
-- **SwiftData**: VPVideo model with @Model macro
-- **@Query**: String-based predicates using kindRaw to avoid enum issues
-- **@State/@Published**: View-level state for playback controls
-- **Singleton Services**: VideoPlayerService.shared pattern
+## Core Architecture
 
-### Platform Divergence
+### System Overview
+```
+┌─────────────────────────────────────────────┐
+│             VideoPlayerApp                   │
+│         (Hybrid: SwiftData + FileSystem)     │
+└─────────────────┬───────────────────────────┘
+                  │
+    ┌─────────────┼─────────────┬──────────────┐
+    ▼             ▼             ▼              ▼
+┌────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
+│  Core  │  │Inspector │  │ Services │  │  Views   │
+├────────┤  ├──────────┤  ├──────────┤  ├──────────┤
+│FileBrws│  │Panel     │  │Player    │  │Movies    │
+│FileSys │  │Outliner  │  │Import    │  │Shows     │
+│FSModel │  │Import    │  │(legacy)  │  │MovieView │
+└────────┘  └──────────┘  └──────────┘  └──────────┘
+     ↕            ↕             ↕            ↕
+┌─────────────────────────────────────────────┐
+│         FileSystem / Documents              │
+│    ├── VideoPlayer/                         │
+│    │   ├── Movies/                          │
+│    │   └── TV Shows/                        │
+└─────────────────────────────────────────────┘
+```
+
+### Key Architectural Patterns
+
+#### Pattern 1: Direct Filesystem Access
+```
+PURPOSE: Eliminate storage duplication, play files in-place
+IMPLEMENTATION: 
+  - FileBrowser for media-specific navigation
+  - FileSystem for general file operations
+  - FileSystemModel for platform abstractions
+BENEFITS: No duplicate storage, instant access, real-time updates
+TRADE-OFFS: Requires security-scoped resources on iOS
+```
+
+#### Pattern 2: Inspector Panel Navigation
+```
+PURPOSE: Replace sidebar with filesystem browser
+IMPLEMENTATION:
+  - InspectorPanel: Container with 75/25 split
+  - OutlinerView: Contains FileBrowser
+  - ImportView: Bookmark management (not file copying)
+BENEFITS: Unified navigation, filesystem visibility
+TRADE-OFFS: More complex than simple sidebar
+```
+
+#### Pattern 3: Platform-Specific Filesystem
+```
+PURPOSE: Handle iOS/tvOS/macOS filesystem differences
+IMPLEMENTATION:
+  iOS: Security-scoped bookmarks, document picker
+  tvOS: Sandbox-only access, no imports
+  macOS: Full filesystem access
+BENEFITS: Native behavior per platform
+TRADE-OFFS: Complex conditional compilation
+```
+
+#### Pattern 4: Hybrid Persistence
+```
+PURPOSE: Maintain metadata while browsing filesystem
+IMPLEMENTATION:
+  - SwiftData: Video metadata, posters (legacy)
+  - Filesystem: Direct file access
+  - Bookmarks: iOS folder persistence
+BENEFITS: Fast queries, direct playback
+TRADE-OFFS: Dual state management
+```
+
+## Component Architecture
+
+### Core/ (Filesystem Layer)
 ```swift
-#if os(tvOS)
-    // Focus engine navigation, button-based volume
-    // No file import, no drag gestures
-    // Larger UI elements for TV viewing
-#elseif os(iOS) 
-    // fileImporter, sheet presentations, drag gestures
-    // NavigationSplitView with sidebar
-    // Context menus for actions
-#else // macOS
-    // Window fullscreen, sidebar with traffic light spacing
-    // Hover states, native window management
-    // Full keyboard and mouse support
-#endif
+FileBrowser.swift
+  ├── MediaFileManager: ObservableObject
+  ├── MediaFileItem: Identifiable
+  └── FileBrowser: View
+      └── Destination enum (movies/shows/file)
+
+FileSystem.swift
+  ├── FileSystemView: General file browser
+  ├── FileTreeItemView: Recursive items
+  └── CreateItemSheet: File/folder creation
+
+FileSystemModel.swift
+  ├── FileSystemItem: File/folder model
+  ├── FileType: Classification system
+  └── FileSystemViewModel: Platform abstractions
 ```
 
-### Data Flow Architecture
-```
-User Action → View → Service → Model → SwiftData
-                ↓        ↓
-            AVPlayer  FileSystem
+### Inspector/ (Navigation)
+```swift
+InspectorPanel.swift
+  ├── Fixed 320pt width (macOS) / 280pt (iOS)
+  ├── 75% OutlinerView / 25% ImportView split
+  └── Glass design system
+
+OutlinerView.swift
+  ├── Contains FileBrowser
+  └── Movies/Shows sections
+
+ImportView.swift
+  └── Bookmark management (not file import)
 ```
 
-## Design Patterns
+### Security Model (iOS)
 
-### Pattern 1: Format Exclusivity
-```
-PURPOSE: Reduce complexity and edge cases
-IMPLEMENTATION: .mpeg4Movie UTType validation, .m4v extension check
-BENEFITS: Stable, predictable behavior (inherited from AudioPlayer)
-TRADE-OFFS: Users must convert other formats
-```
+#### Security-Scoped Resources
+```swift
+// Request access
+let didAccess = url.startAccessingSecurityScopedResource()
+defer { 
+    if didAccess { 
+        url.stopAccessingSecurityScopedResource() 
+    }
+}
 
-### Pattern 2: kindRaw String Workaround
-```
-PURPOSE: SwiftData predicates fail with enum.rawValue
-IMPLEMENTATION: Store string primitive, wrap with computed property
-BENEFITS: Reliable queries across all platforms
-TRADE-OFFS: Dual storage (enum + string)
-```
-
-### Pattern 3: Service Layer Singleton
-```
-PURPOSE: Centralized video playback and import logic
-IMPLEMENTATION: VideoPlayerService.shared, VideoImportService.shared
-BENEFITS: Single source of truth, easy DI in views
-TRADE-OFFS: Global state, testing complexity
+// Persist via bookmarks
+let bookmarkData = try url.bookmarkData(
+    options: .minimalBookmark,
+    includingResourceValuesForKeys: nil,
+    relativeTo: nil
+)
+UserDefaults.standard.set(bookmarkData, forKey: key)
 ```
 
-### Pattern 4: Coordinated File Access
+#### Document Picker Integration
+```swift
+UIDocumentPickerViewController(forOpeningContentTypes: [.folder, .item])
+  → Security-scoped URL
+  → Create bookmark
+  → Access folder contents
 ```
-PURPOSE: Prevent file access crashes during import
-IMPLEMENTATION: NSFileCoordinator for all file operations
-BENEFITS: Thread-safe, system-coordinated access
-TRADE-OFFS: Slightly more complex than direct access
+
+## Data Flow
+
+### Browse → Play Flow
+```
+1. FileBrowser displays Documents/VideoPlayer structure
+2. User navigates Movies/ or TV Shows/ folders
+3. Tap .m4v file → AVPlayer loads URL directly
+4. No copying, no import, instant playback
+```
+
+### iOS Folder Access Flow
+```
+1. ImportView → Document Picker
+2. Select folder → Security-scoped URL
+3. Create bookmark → UserDefaults
+4. Resolve bookmark → Access folder
+5. Browse contents → Play files
+```
+
+## Platform Adaptations
+
+### iOS
+- Documents/VideoPlayer/ as root
+- Security-scoped bookmarks for external folders
+- Document picker for folder selection
+- Sheet presentations for fullscreen
+- Files app integration via Info.plist
+
+### tvOS
+- Sandbox-only (no external storage)
+- Documents/VideoPlayer/ created automatically
+- No import capability
+- Focus-based navigation
+- Button-based volume controls
+
+### macOS
+- Full filesystem access
+- Home/Desktop/Documents/Downloads navigation
+- Native window management
+- Reveal in Finder / Open in Terminal
+- Hover states on all interactive elements
+
+## Movies/Shows Organization
+
+### Filesystem Structure
+```
+Documents/
+└── VideoPlayer/
+    ├── Movies/
+    │   ├── Action Movie.m4v
+    │   └── Comedy Movie.m4v
+    └── TV Shows/
+        ├── Series S01E01.m4v
+        └── Series S01E02.m4v
+```
+
+### Detection Logic
+1. **Folder-based**: "Movies" and "TV Shows" folders
+2. **Legacy SwiftData**: kindRaw field for imported videos
+3. **Future**: Metadata extraction from files
+
+## Performance Optimizations
+
+### Current
+- Direct file playback (no copying)
+- Lazy loading in grids
+- Poster caching in Application Support
+- Single AVPlayer instance
+
+### Needed
+- Background poster generation
+- File watching for updates
+- Preview frame caching
+- Async directory enumeration
+
+## Security & Permissions
+
+### Info.plist Keys
+```xml
+<key>UIFileSharingEnabled</key><true/>
+<key>LSSupportsOpeningDocumentsInPlace</key><true/>
+<key>UISupportsDocumentBrowser</key><true/>
+```
+
+### Entitlements
+```xml
+<key>com.apple.security.app-sandbox</key><true/>
+<key>com.apple.security.files.user-selected.read-only</key><true/>
 ```
 
 ## Anti-Patterns to Avoid
 
-### ❌ NEVER: Query enum values directly in predicates
-```swift
-// WRONG - This crashes at runtime
-@Query(filter: #Predicate<VPVideo> { $0.kind == .movie })
+### ❌ NEVER: Copy files on "import"
+The system now browses files in-place. Never duplicate.
 
-// CORRECT - Use kindRaw string
-@Query(filter: #Predicate<VPVideo> { $0.kindRaw == "movie" })
-```
+### ❌ NEVER: Assume filesystem access
+Always use security-scoped resources on iOS.
 
-### ❌ NEVER: Use DragGesture on tvOS
-```swift
-// WRONG - tvOS doesn't support drag
-.gesture(DragGesture()...)
+### ❌ NEVER: Mix import and browse paradigms
+The UI should be consistent: we browse, not import.
 
-// CORRECT - Platform-specific controls
-#if os(tvOS)
-    Button("-") { adjustVolume(-0.1) }
-    Text("\(Int(volume * 100))%")
-    Button("+") { adjustVolume(0.1) }
-#else
-    GlassVolumeSlider(volume: $volume)
-#endif
-```
+## Technical Debt & Migration
 
-### ❌ NEVER: Access files without coordination
-```swift
-// WRONG - Can cause overlapping access
-try FileManager.default.copyItem(at: source, to: dest)
+### Legacy Components (Still Present)
+- VideoImportService: Partially used for metadata
+- SwiftData VPVideo model: May be removed
+- kindRaw workaround: Still needed if keeping SwiftData
 
-// CORRECT - Use coordinator
-coordinator.coordinate(writingItemAt: source, options: .forMoving) { url in
-    try FileManager.default.copyItem(at: url, to: dest)
-}
-```
+### Migration Path
+1. ✅ Phase 1: Add filesystem browsing (COMPLETE)
+2. ⚠️ Phase 2: Maintain dual system (CURRENT)
+3. 🔜 Phase 3: Remove import pipeline
+4. 🔜 Phase 4: Optional - remove SwiftData
 
-## Architectural Decisions Log
+## Architecture Decision Records
 
-### Decision: Fork AudioPlayer → VideoPlayer
-**Rationale**: Proven architecture, similar single-format philosophy  
-**Implementation**: Replace audio components with video equivalents  
-**Result**: Rapid development with stable foundation
+### ADR-001: Filesystem-First Navigation
+**Date**: September 2025  
+**Status**: Implemented  
+**Context**: Storage duplication was wasteful  
+**Decision**: Browse and play files directly  
+**Consequences**: More complex iOS security, simpler overall flow  
 
-### Decision: 2:3 Poster Aspect Ratio
-**Rationale**: Match DVD/Blu-ray box art standard  
-**Implementation**: AspectRatio(2/3) throughout poster views  
-**Result**: Professional, recognizable video library aesthetic
+### ADR-002: Inspector Panel Design
+**Date**: September 2025  
+**Status**: Implemented  
+**Context**: Sidebar couldn't show filesystem hierarchy  
+**Decision**: Replace with Inspector containing FileBrowser  
+**Consequences**: Better visibility, more complex navigation  
 
-### Decision: Singleton Services
-**Rationale**: Single AVPlayer instance, centralized import logic  
-**Implementation**: Static shared instances with @MainActor  
-**Result**: Clean dependency injection, predictable state
+### ADR-003: Maintain M4V Restriction
+**Date**: September 2025  
+**Status**: Maintained  
+**Context**: Considered expanding format support  
+**Decision**: Keep M4V-only discipline  
+**Consequences**: Simpler testing, consistent behavior  
 
-### Decision: SwiftData for Persistence
-**Rationale**: Native Apple solution, good SwiftUI integration  
-**Implementation**: @Model macro with manual migration support  
-**Result**: Simple persistence with some macro limitations
-
-## Component Responsibilities
-
-### Models (VPVideo)
-- Store video metadata
-- Provide kindRaw for queries
-- Define relationships (future: playlists)
-
-### Services
-- **VideoImportService**: File validation, import, deletion
-- **VideoPlayerService**: AVPlayer management, playback state
-
-### Views
-- **ContentView**: Platform-specific navigation container
-- **Sidebar**: Library organization, import controls
-- **MoviesView/ShowsView**: Grid displays
-- **MovieView**: Playback screen with controls
-- **MoviePoster**: 2:3 aspect ratio component
-
-## Performance Considerations
-
-### Optimized
-- LazyVGrid for efficient scrolling
-- Poster caching via filesystem
-- Single AVPlayer instance
-- SwiftData lazy loading
-
-### Needs Optimization
-- Poster generation blocks UI
-- No preview frame caching
-- Full file copy on import
-- No background queue usage
-
-## Security & Sandboxing
-
-### Entitlements
-- `com.apple.security.app-sandbox`: YES
-- `com.apple.security.files.user-selected.read-only`: YES
-
-### File Access
-- Import: Security-scoped via fileImporter
-- Playback: Direct access to app container
-- Deletion: Coordinated removal
-
-## Future Architecture Considerations
-
-### Scalability
-- Move to actor model for services
-- Background queue for heavy operations
-- Streaming instead of full copy
-- CloudKit sync preparation
-
-### Modularity
-- Separate playback engine
-- Plugin architecture for formats
-- Themeable UI system
-- Testable service layer
+### ADR-004: Hybrid SwiftData/Filesystem
+**Date**: September 2025  
+**Status**: Active  
+**Context**: Need metadata while browsing files  
+**Decision**: Keep SwiftData for now, may remove later  
+**Consequences**: Dual state management complexity
